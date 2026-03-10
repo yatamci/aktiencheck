@@ -22,8 +22,8 @@ function formatValue(value: number | null | undefined, type?: string): string {
 function ScoreBadge({ score }: { score: Score }) {
   if (score === 'neutral') {
     return (
-      <div className="score-badge score-neutral" title="Keine Daten">
-        <span className="score-icon">—</span>
+      <div className="score-badge score-neutral" title="Keine Daten verfügbar">
+        <span style={{ fontSize: '0.9rem', color: 'var(--text-3)' }}>–</span>
       </div>
     )
   }
@@ -31,7 +31,7 @@ function ScoreBadge({ score }: { score: Score }) {
     return (
       <div className="score-badge score-good" title="Gut">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M4 9l3.5 3.5L14 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M4 9l3.5 3.5L14 6" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </div>
     )
@@ -40,8 +40,8 @@ function ScoreBadge({ score }: { score: Score }) {
     return (
       <div className="score-badge score-warn" title="Achtung">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <path d="M9 5v5" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
-          <circle cx="9" cy="13" r="1.2" fill="white"/>
+          <path d="M9 5v5" stroke="white" strokeWidth="2.4" strokeLinecap="round"/>
+          <circle cx="9" cy="13.2" r="1.3" fill="white"/>
         </svg>
       </div>
     )
@@ -49,7 +49,7 @@ function ScoreBadge({ score }: { score: Score }) {
   return (
     <div className="score-badge score-bad" title="Schlecht">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M5.5 5.5l7 7M12.5 5.5l-7 7" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
+        <path d="M5.5 5.5l7 7M12.5 5.5l-7 7" stroke="white" strokeWidth="2.4" strokeLinecap="round"/>
       </svg>
     </div>
   )
@@ -68,12 +68,7 @@ export default function MetricCard({ metric }: MetricCardProps) {
         </div>
       </div>
       <div className="metric-right">
-        <span className="metric-value">{formattedValue}</span>
-        <div className="metric-thresholds">
-          <span className="threshold-good">✓ {metric.goodThreshold}</span>
-          <span className="threshold-warn">! {metric.warnThreshold}</span>
-          <span className="threshold-bad">✗ {metric.badThreshold}</span>
-        </div>
+        <span className={`metric-value metric-value--${metric.score}`}>{formattedValue}</span>
       </div>
     </div>
   )
