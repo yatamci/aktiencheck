@@ -1,22 +1,22 @@
 import ScoreIndicator from "./ScoreIndicator"
-import { evaluatePE } from "../lib/evaluate"
 
-export default function MetricRow({label,value}:{label:string,value:number}){
-
-const score = evaluatePE(value)
+export default function MetricRow({label,value,score}:{label:string,value:number,score:string}){
 
 return(
 
-<div className="flex justify-between border-b pb-2">
+<div className="flex justify-between items-center bg-zinc-100 dark:bg-zinc-800 p-3 rounded">
 
-<span>{label}</span>
+<div>
 
-<div className="flex gap-2">
-<span>{value}</span>
-<ScoreIndicator score={score}/>
+<p className="font-semibold">{label}</p>
+<p className="text-sm text-zinc-500">{value}</p>
+
 </div>
+
+<ScoreIndicator score={score}/>
 
 </div>
 
 )
+
 }
