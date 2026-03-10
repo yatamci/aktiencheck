@@ -1,7 +1,7 @@
 interface MetricRowProps {
   label: string;
   value: number | null;
-  score: 'good' | 'warning' | 'bad';
+  score: 'good' | 'bad' | 'warn';
 }
 
 export default function MetricRow({ label, value, score }: MetricRowProps) {
