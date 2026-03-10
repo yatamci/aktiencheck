@@ -25,15 +25,12 @@ export default function MetricRow({ label, value, score }: MetricRowProps) {
 
   const formatValue = (val: number | null) => {
     if (val === null || val === undefined) return '-';
-    
     if (label === 'ROE' && val < 1) {
       return `${(val * 100).toFixed(1)}%`;
     }
-    
     if (typeof val === 'number') {
       return val.toFixed(2);
     }
-    
     return val;
   };
 
