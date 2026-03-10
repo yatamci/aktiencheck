@@ -3,6 +3,10 @@ export type Score = 'good' | 'warn' | 'bad' | 'neutral'
 export interface StockData {
   name?: string
   symbol?: string
+  sector?: string
+  industry?: string
+  price?: number | null
+  currency?: string
   pe?: number | null
   ps?: number | null
   pb?: number | null
