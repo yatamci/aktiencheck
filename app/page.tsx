@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import ThemeToggle from '../components/ThemeToggle'
 import MetricCard from '../components/MetricCard'
 import SearchBar from '../components/SearchBar'
+import MAChart from '../components/MAChart'
 import {
   StockData,
   buildMetrics,
@@ -11,11 +12,11 @@ import {
 } from '../lib/evaluate'
 
 const SECTIONS = [
-  { title: 'Bewertung', keys: ['pe', 'ps', 'pb'] },
-  { title: 'Rentabilität', keys: ['roe', 'roa', 'grossMargin', 'operatingMargin', 'netMargin'] },
-  { title: 'Liquidität & Verschuldung', keys: ['cashflow', 'debt', 'currentRatio'] },
-  { title: 'Technische Analyse', keys: ['rsi'] },
-  { title: 'Dividende & Wachstum', keys: ['dividendYield', 'revenueGrowth', 'earningsGrowth'] },
+  { title: 'Bewertung',                   keys: ['pe', 'ps', 'pb'] },
+  { title: 'Rentabilität',                keys: ['roe', 'roa', 'grossMargin', 'operatingMargin', 'netMargin'] },
+  { title: 'Liquidität & Verschuldung',   keys: ['cashflow', 'debt', 'currentRatio'] },
+  { title: 'Technische Analyse',          keys: ['rsi'] },
+  { title: 'Dividende & Wachstum',        keys: ['dividendYield', 'revenueGrowth', 'earningsGrowth'] },
 ]
 
 function ScoreRing({ pct, color }: { pct: number; color: string }) {
@@ -27,8 +28,7 @@ function ScoreRing({ pct, color }: { pct: number; color: string }) {
       <svg width="80" height="80" viewBox="0 0 80 80">
         <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" stroke="var(--border)" />
         <circle
-          cx="40" cy="40" r={r}
-          fill="none" strokeWidth="7"
+          cx="40" cy="40" r={r} fill="none" strokeWidth="7"
           stroke={color}
           strokeDasharray={circ}
           strokeDashoffset={offset}
@@ -56,11 +56,8 @@ export default function Home() {
     try {
       const res = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`)
       const json: StockData = await res.json()
-      if (json.error) {
-        setError(json.error)
-      } else {
-        setData(json)
-      }
+      if (json.error) setError(json.error)
+      else setData(json)
     } catch {
       setError('Netzwerkfehler. Bitte prüfe deine Verbindung.')
     } finally {
@@ -68,11 +65,11 @@ export default function Home() {
     }
   }, [])
 
-  const metrics = data ? buildMetrics(data) : []
-  const overall = metrics.length > 0 ? calculateOverallScore(metrics) : null
-  const goodCount = metrics.filter((m) => m.score === 'good').length
-  const warnCount = metrics.filter((m) => m.score === 'warn').length
-  const badCount  = metrics.filter((m) => m.score === 'bad').length
+  const metrics    = data ? buildMetrics(data) : []
+  const overall    = metrics.length > 0 ? calculateOverallScore(metrics) : null
+  const goodCount  = metrics.filter((m) => m.score === 'good').length
+  const warnCount  = metrics.filter((m) => m.score === 'warn').length
+  const badCount   = metrics.filter((m) => m.score === 'bad').length
 
   return (
     <main className="page-container">
@@ -80,14 +77,12 @@ export default function Home() {
       <header className="header">
         <div className="logo">
           <div className="logo-icon">📈</div>
-          <h1 className="logo-text">
-            Aktien<span>check</span>
-          </h1>
+          <h1 className="logo-text">Aktien<span>check</span></h1>
         </div>
         <ThemeToggle />
       </header>
 
-      {/* Search with Autocomplete */}
+      {/* Search */}
       <SearchBar onSearch={search} loading={loading} />
 
       {/* Loading */}
@@ -106,7 +101,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty */}
       {!data && !loading && !error && (
         <div className="empty-state fade-in">
           <div className="empty-icon">🔍</div>
@@ -143,22 +138,10 @@ export default function Home() {
 
           {/* Legend */}
           <div className="legend">
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: 'var(--good)' }} />
-              Gut
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: 'var(--warn)' }} />
-              Aufpassen
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: 'var(--bad)' }} />
-              Schlecht
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: 'var(--neutral)' }} />
-              Keine Daten
-            </div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--good)' }} />Gut</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--warn)' }} />Aufpassen</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--bad)'  }} />Schlecht</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--neutral)' }} />Keine Daten</div>
           </div>
 
           {/* Metric Sections */}
@@ -176,6 +159,20 @@ export default function Home() {
               </div>
             )
           })}
+
+          {/* MA Chart */}
+          {data.chartData && data.chartData.length > 0 && (
+            <>
+              <p className="section-title" style={{ marginTop: 32 }}>Trendanalyse</p>
+              <MAChart
+                data={data.chartData}
+                crossSignal={data.crossSignal ?? 'none'}
+                ma50Latest={data.ma50Latest ?? null}
+                ma200Latest={data.ma200Latest ?? null}
+                currency={data.currency ?? 'USD'}
+              />
+            </>
+          )}
 
           {/* Overall Score */}
           {overall && (
