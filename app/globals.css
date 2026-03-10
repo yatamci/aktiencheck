@@ -2,35 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Smooth Theme Transition */
-html {
-  transition: background-color 0.3s ease, color 0.3s ease;
+body{
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
-/* App Background */
-body {
-  min-height: 100vh;
-}
-
-/* Input Style */
-input {
-  outline: none;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: #555;
+html{
+  transition: background-color 0.3s, color 0.3s;
 }
