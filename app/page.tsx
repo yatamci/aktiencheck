@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import ThemeToggle from '../components/ThemeToggle'
 import MetricCard from '../components/MetricCard'
+import SearchBar from '../components/SearchBar'
 import {
   StockData,
   buildMetrics,
@@ -26,11 +27,8 @@ function ScoreRing({ pct, color }: { pct: number; color: string }) {
       <svg width="80" height="80" viewBox="0 0 80 80">
         <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" stroke="var(--border)" />
         <circle
-          cx="40"
-          cy="40"
-          r={r}
-          fill="none"
-          strokeWidth="7"
+          cx="40" cy="40" r={r}
+          fill="none" strokeWidth="7"
           stroke={color}
           strokeDasharray={circ}
           strokeDashoffset={offset}
@@ -47,20 +45,16 @@ function ScoreRing({ pct, color }: { pct: number; color: string }) {
 }
 
 export default function Home() {
-  const [query, setQuery] = useState('')
   const [data, setData] = useState<StockData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
-  const search = useCallback(async (q: string) => {
-    const trimmed = q.trim()
-    if (!trimmed) return
+  const search = useCallback(async (symbol: string) => {
     setLoading(true)
     setError(null)
     setData(null)
     try {
-      const res = await fetch(`/api/stock?symbol=${encodeURIComponent(trimmed)}`)
+      const res = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`)
       const json: StockData = await res.json()
       if (json.error) {
         setError(json.error)
@@ -73,8 +67,6 @@ export default function Home() {
       setLoading(false)
     }
   }, [])
-
-  const handleSubmit = () => search(query)
 
   const metrics = data ? buildMetrics(data) : []
   const overall = metrics.length > 0 ? calculateOverallScore(metrics) : null
@@ -95,30 +87,10 @@ export default function Home() {
         <ThemeToggle />
       </header>
 
-      {/* Search */}
-      <div className="search-wrapper">
-        <div className="search-container">
-          <input
-            ref={inputRef}
-            type="text"
-            className="search-input"
-            placeholder="Aktie suchen – z.B. Apple, AAPL, Tesla, SAP ..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            disabled={loading}
-          />
-          <button
-            className="search-button"
-            onClick={handleSubmit}
-            disabled={loading || !query.trim()}
-          >
-            {loading ? 'Lädt …' : 'Analysieren'}
-          </button>
-        </div>
-      </div>
+      {/* Search with Autocomplete */}
+      <SearchBar onSearch={search} loading={loading} />
 
-      {/* States */}
+      {/* Loading */}
       {loading && (
         <div className="loading-wrapper fade-in">
           <div className="spinner" />
@@ -126,6 +98,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Error */}
       {error && !loading && (
         <div className="glass-card error-card fade-in">
           <p className="error-title">Fehler beim Laden</p>
@@ -133,6 +106,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Empty state */}
       {!data && !loading && !error && (
         <div className="empty-state fade-in">
           <div className="empty-icon">🔍</div>
@@ -144,6 +118,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Results */}
       {data && !loading && (
         <div className="fade-in">
           {/* Stock Header */}
@@ -220,7 +195,7 @@ export default function Home() {
                       </div>
                       <div className="score-breakdown-row">
                         <div className="breakdown-dot" style={{ background: 'var(--warn)' }} />
-                        {warnCount} Kriterien im Grenzbereich
+                        {warnCount} im Grenzbereich
                       </div>
                       <div className="score-breakdown-row">
                         <div className="breakdown-dot" style={{ background: 'var(--bad)' }} />
