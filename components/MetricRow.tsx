@@ -1,22 +1,51 @@
-import ScoreIndicator from "./ScoreIndicator"
+interface MetricRowProps {
+  label: string;
+  value: number | null;
+  score: 'good' | 'warning' | 'bad';
+}
 
-export default function MetricRow({label,value,score}:{label:string,value:number,score:string}){
+export default function MetricRow({ label, value, score }: MetricRowProps) {
+  const getBadgeClass = () => {
+    switch(score) {
+      case 'good': return 'badge-good';
+      case 'warning': return 'badge-warning';
+      case 'bad': return 'badge-bad';
+      default: return 'badge-bad';
+    }
+  };
 
-return(
+  const getIcon = () => {
+    switch(score) {
+      case 'good': return '✅';
+      case 'warning': return '⚠️';
+      case 'bad': return '❌';
+      default: return '❌';
+    }
+  };
 
-<div className="flex justify-between items-center bg-zinc-100 dark:bg-zinc-800 p-3 rounded">
+  const formatValue = (val: number | null) => {
+    if (val === null || val === undefined) return '-';
+    
+    if (label === 'ROE' && val < 1) {
+      return `${(val * 100).toFixed(1)}%`;
+    }
+    
+    if (typeof val === 'number') {
+      return val.toFixed(2);
+    }
+    
+    return val;
+  };
 
-<div>
-
-<p className="font-semibold">{label}</p>
-<p className="text-sm text-zinc-500">{value}</p>
-
-</div>
-
-<ScoreIndicator score={score}/>
-
-</div>
-
-)
-
+  return (
+    <div className="metric-card">
+      <div className="metric-info">
+        <span className="metric-label">{label}</span>
+        <span className="metric-value">{formatValue(value)}</span>
+      </div>
+      <div className={`metric-badge ${getBadgeClass()}`}>
+        {getIcon()}
+      </div>
+    </div>
+  );
 }
