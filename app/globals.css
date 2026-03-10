@@ -2,10 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
-body{
-  font-family: system-ui, -apple-system, sans-serif;
+:root {
+  --background: #ffffff;
+  --foreground: #0B0B0B;
+  --card-bg: #F5F5F5;
+  --success: #00C853;
+  --danger: #FF3B30;
+  --warning: #FFCC00;
 }
 
-html{
-  transition: background-color 0.3s, color 0.3s;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #000000;
+    --foreground: #ffffff;
+    --card-bg: #1C1C1E;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.glass-card {
+  background: rgba(28, 28, 30, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.metric-card {
+  @apply glass-card p-4 flex flex-col items-center justify-center;
+}
+
+.metric-label {
+  @apply text-sm text-gray-400 mb-1;
+}
+
+.metric-value {
+  @apply text-xl font-semibold;
+}
+
+.metric-badge {
+  @apply px-3 py-1 rounded-full text-sm font-medium;
+}
+
+.badge-success {
+  @apply bg-green-500/20 text-green-500;
+}
+
+.badge-danger {
+  @apply bg-red-500/20 text-red-500;
+}
+
+.badge-warning {
+  @apply bg-yellow-500/20 text-yellow-500;
 }
