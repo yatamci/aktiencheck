@@ -6,22 +6,22 @@ interface MetricRowProps {
 
 export default function MetricRow({ label, value, score }: MetricRowProps) {
   const getBadgeClass = () => {
-    switch(score) {
-      case 'good': return 'badge-good';
-      case 'warning': return 'badge-warning';
-      case 'bad': return 'badge-bad';
-      default: return 'badge-bad';
-    }
-  };
+  switch(score) {
+    case 'good': return 'badge-good';
+    case 'warn': return 'badge-warning';  // 'warn' verwendet trotzdem warning-Style
+    case 'bad': return 'badge-bad';
+    default: return 'badge-bad';
+  }
+};
 
-  const getIcon = () => {
-    switch(score) {
-      case 'good': return '✅';
-      case 'warning': return '⚠️';
-      case 'bad': return '❌';
-      default: return '❌';
-    }
-  };
+const getIcon = () => {
+  switch(score) {
+    case 'good': return '✅';
+    case 'warn': return '⚠️';  // Warnung bleibt ⚠️
+    case 'bad': return '❌';
+    default: return '❌';
+  }
+};
 
   const formatValue = (val: number | null) => {
     if (val === null || val === undefined) return '-';
