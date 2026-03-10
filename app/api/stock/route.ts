@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Search for symbol
+    // Resolve symbol from name/query
     const searchRes = await fetch(
       `https://financialmodelingprep.com/api/v3/search?query=${encodeURIComponent(query)}&limit=1&apikey=${key}`
     )
@@ -30,60 +30,71 @@ export async function GET(req: NextRequest) {
       name = searchData[0].name
     }
 
-    // Fetch all data in parallel
-    const [ratiosRes, metricsRes, profileRes, growthRes, technicalRes] = await Promise.allSettled([
+    // Fetch all data in parallel – TTM as primary, annual as fallback
+    const [rttmRes, rannRes, mttmRes, mannRes, profileRes, growthRes, techRes] = await Promise.allSettled([
+      fetch(`https://financialmodelingprep.com/api/v3/ratios-ttm/${symbol}?apikey=${key}`),
       fetch(`https://financialmodelingprep.com/api/v3/ratios/${symbol}?limit=1&apikey=${key}`),
+      fetch(`https://financialmodelingprep.com/api/v3/key-metrics-ttm/${symbol}?apikey=${key}`),
       fetch(`https://financialmodelingprep.com/api/v3/key-metrics/${symbol}?limit=1&apikey=${key}`),
       fetch(`https://financialmodelingprep.com/api/v3/profile/${symbol}?apikey=${key}`),
       fetch(`https://financialmodelingprep.com/api/v3/financial-growth/${symbol}?limit=1&apikey=${key}`),
       fetch(`https://financialmodelingprep.com/api/v3/technical_indicator/daily/${symbol}?period=14&type=rsi&limit=1&apikey=${key}`),
     ])
 
-    const ratios = ratiosRes.status === 'fulfilled' ? await ratiosRes.value.json() : []
-    const metrics = metricsRes.status === 'fulfilled' ? await metricsRes.value.json() : []
-    const profile = profileRes.status === 'fulfilled' ? await profileRes.value.json() : []
-    const growth = growthRes.status === 'fulfilled' ? await growthRes.value.json() : []
-    const technical = technicalRes.status === 'fulfilled' ? await technicalRes.value.json() : []
+    const safe = async (res: PromiseSettledResult<Response>) =>
+      res.status === 'fulfilled' ? res.value.json().catch(() => []) : []
 
-    const r = ratios?.[0] ?? {}
-    const m = metrics?.[0] ?? {}
-    const p = profile?.[0] ?? {}
-    const g = growth?.[0] ?? {}
-    const t = technical?.[0] ?? {}
+    const [rttmRaw, rannArr, mttmRaw, mannArr, profileArr, growthArr, techArr] = await Promise.all([
+      safe(rttmRes), safe(rannRes), safe(mttmRes), safe(mannRes),
+      safe(profileRes), safe(growthRes), safe(techRes),
+    ])
 
-    const stockName = p.companyName || name
+    // FMP ratios-ttm / key-metrics-ttm return a single object OR an array with one object
+    const rttm: Record<string, number> = Array.isArray(rttmRaw) ? (rttmRaw[0] ?? {}) : (rttmRaw ?? {})
+    const rann: Record<string, number> = Array.isArray(rannArr) ? (rannArr[0] ?? {}) : {}
+    const mttm: Record<string, number> = Array.isArray(mttmRaw) ? (mttmRaw[0] ?? {}) : (mttmRaw ?? {})
+    const mann: Record<string, number> = Array.isArray(mannArr) ? (mannArr[0] ?? {}) : {}
+    const p = Array.isArray(profileArr) ? (profileArr[0] ?? {}) : {}
+    const g: Record<string, number> = Array.isArray(growthArr) ? (growthArr[0] ?? {}) : {}
+    const t: Record<string, number> = Array.isArray(techArr)   ? (techArr[0]   ?? {}) : {}
+
+    // Helper: prefer TTM value, fall back to annual key name variants
+    const rv = (ttmKey: string, annKey: string): number | null =>
+      rttm[ttmKey] ?? rann[annKey] ?? rann[ttmKey] ?? null
+    const mv = (ttmKey: string, annKey: string): number | null =>
+      mttm[ttmKey] ?? mann[annKey] ?? mann[ttmKey] ?? null
 
     return NextResponse.json({
-      name: stockName,
+      name:     p.companyName || name,
       symbol,
-      sector: p.sector,
-      industry: p.industry,
-      price: p.price,
+      sector:   p.sector   ?? null,
+      industry: p.industry ?? null,
+      price:    p.price    ?? null,
       currency: p.currency || 'USD',
 
       // Valuation
-      pe: r.priceEarningsRatio ?? null,
-      ps: r.priceToSalesRatio ?? null,
-      pb: r.priceToBookRatio ?? null,
+      pe:  rv('peRatioTTM',            'priceEarningsRatio'),
+      ps:  rv('priceToSalesRatioTTM',  'priceToSalesRatio'),
+      pb:  rv('priceToBookRatioTTM',   'priceToBookRatio'),
 
       // Profitability
-      roe: r.returnOnEquity ?? null,
-      roa: r.returnOnAssets ?? null,
-      grossMargin: r.grossProfitMargin ?? null,
-      operatingMargin: r.operatingProfitMargin ?? null,
-      netMargin: r.netProfitMargin ?? null,
+      roe:             rv('returnOnEquityTTM',        'returnOnEquity'),
+      roa:             rv('returnOnAssetsTTM',        'returnOnAssets'),
+      grossMargin:     rv('grossProfitMarginTTM',     'grossProfitMargin'),
+      operatingMargin: rv('operatingProfitMarginTTM', 'operatingProfitMargin'),
+      netMargin:       rv('netProfitMarginTTM',       'netProfitMargin'),
 
       // Cash & Debt
-      cashflow: m.freeCashFlowPerShare ?? null,
-      debt: r.debtEquityRatio ?? null,
-      currentRatio: r.currentRatio ?? null,
+      cashflow:     mv('freeCashFlowPerShareTTM', 'freeCashFlowPerShare'),
+      debt:         rv('debtEquityRatioTTM',      'debtEquityRatio'),
+      currentRatio: rv('currentRatioTTM',         'currentRatio'),
 
       // Technical
       rsi: t.rsi ?? null,
 
-      // Income & Growth
-      dividendYield: r.dividendYield ?? null,
-      revenueGrowth: g.revenueGrowth ?? null,
+      // Dividend & Growth
+      dividendYield:  rv('dividendYieldTTM',  'dividendYield'),
+      revenueGrowth:  g.revenueGrowth  ?? null,
       earningsGrowth: g.netIncomeGrowth ?? null,
     })
   } catch (err: unknown) {
