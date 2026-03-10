@@ -1,10 +1,11 @@
+"use client"
+
 import { useEffect, useState } from 'react';
 
 export default function ThemeToggle() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    // Prüfe System-Theme oder gespeichertes Theme
     const stored = localStorage.getItem('theme');
     const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
