@@ -1,20 +1,36 @@
-"use client"
+import { useEffect, useState } from 'react';
 
-export default function ThemeToggle(){
+export default function ThemeToggle() {
+  const [isDark, setIsDark] = useState(false);
 
-function toggle(){
-document.documentElement.classList.toggle("dark")
-}
+  useEffect(() => {
+    // Prüfe System-Theme oder gespeichertes Theme
+    const stored = localStorage.getItem('theme');
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (stored === 'dark' || (!stored && systemDark)) {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setIsDark(false);
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
 
-return(
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    if (isDark) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
+  };
 
-<button
-onClick={toggle}
-className="border rounded px-3 py-1 text-lg"
->
-🌙
-</button>
-
-)
-
+  return (
+    <button onClick={toggleTheme} className="theme-toggle">
+      {isDark ? '☀️' : '🌙'}
+    </button>
+  );
 }
