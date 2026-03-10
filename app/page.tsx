@@ -82,17 +82,11 @@ value={data.cashflow}
 score={data.cashflow > 0 ? "good" : "bad"}
 />
 
-<div className="mt-6 p-4 bg-blue-100 dark:bg-blue-900 rounded">
-
-<p className="font-semibold">
-
-Gesamtscore: {calculateScore(data)} / 5
-
-</p>
-
-</div>
-
-</div>
+<div className="score-card">
+      <span className="text-lg font-medium">Gesamtscore</span>
+      <span className="score-number">{calculateScore(data)} / 5</span>
+    </div>
+  </div>
 
 )}
 
