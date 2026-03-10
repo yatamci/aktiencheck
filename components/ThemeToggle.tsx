@@ -1,37 +1,33 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
 
 export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+  const [dark, setDark] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('theme');
-    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (stored === 'dark' || (!stored && systemDark)) {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
-    } else {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
+    const stored = localStorage.getItem('theme')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const isDark = stored === 'dark' || (!stored && prefersDark)
+    setDark(isDark)
+    document.documentElement.classList.toggle('dark', isDark)
+  }, [])
 
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    }
-  };
+  function toggle() {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    localStorage.setItem('theme', next ? 'dark' : 'light')
+  }
 
   return (
-    <button onClick={toggleTheme} className="theme-toggle">
-      {isDark ? '☀️' : '🌙'}
+    <button
+      onClick={toggle}
+      className="theme-toggle"
+      aria-label="Theme wechseln"
+      title={dark ? 'Zum Light Mode wechseln' : 'Zum Dark Mode wechseln'}
+    >
+      <span className="theme-icon">{dark ? '☀️' : '🌙'}</span>
     </button>
-  );
+  )
 }
