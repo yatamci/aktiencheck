@@ -763,3 +763,116 @@ body {
 .metric-value--warn { color: var(--warn); }
 .metric-value--bad  { color: var(--bad);  }
 .metric-value--neutral { color: var(--text); }
+
+/* ── MA Chart ── */
+.ma-chart-card {
+  padding: 20px 20px 16px;
+  margin-bottom: 0;
+}
+
+.ma-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ma-chart-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.ma-chart-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-3);
+}
+
+.ma-chart-canvas-wrap {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg2);
+}
+
+.ma-chart-legend {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.ma-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--text-2);
+}
+
+.ma-legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.ma-legend-line--dashed {
+  background: none !important;
+  border-top: 2px dashed #ff9500;
+  height: 0;
+  margin-top: 1px;
+}
+
+.ma-legend-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ── Cross Badge ── */
+.cross-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.cross-badge--golden {
+  background: rgba(255, 215, 0, 0.1);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.cross-badge--death {
+  background: rgba(255, 59, 48, 0.1);
+  border-color: rgba(255, 59, 48, 0.25);
+}
+
+.cross-badge--none {
+  background: var(--neutral-bg);
+  border-color: var(--border);
+}
+
+.cross-badge-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.cross-badge-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.cross-badge-sub {
+  font-size: 0.72rem;
+  color: var(--text-2);
+}
