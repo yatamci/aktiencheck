@@ -1,50 +1,109 @@
 "use client"
 
-import { useState } from "react"
+import {useState} from "react"
+
 import SearchBar from "../components/SearchBar"
-import MetricRow from "../components/MetricRow"
 import ThemeToggle from "../components/ThemeToggle"
+import MetricRow from "../components/MetricRow"
 
-export default function Home() {
+import {
+evaluatePE,
+evaluatePS,
+evaluateROE,
+evaluateDebt,
+evaluateRSI,
+calculateScore
+} from "../lib/evaluate"
 
-  const [data,setData] = useState<any>(null)
+export default function Home(){
 
-  const searchStock = async(symbol:string)=>{
+const [data,setData] = useState<any>(null)
 
-    const res = await fetch(`/api/stock?symbol=${symbol}`)
-    const json = await res.json()
+async function searchStock(symbol:string){
 
-    setData(json)
-  }
+const res = await fetch(`/api/stock?symbol=${symbol}`)
+const json = await res.json()
 
-  return(
-    <main className="max-w-3xl mx-auto p-6">
+setData(json)
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Aktiencheck</h1>
-        <ThemeToggle/>
-      </div>
+}
 
-      <SearchBar onSearch={searchStock}/>
+return(
 
-      {data && (
-        <div className="mt-8 space-y-3">
+<main className="max-w-2xl mx-auto p-6 space-y-6">
 
-          <MetricRow label="KGV" value={data.pe}/>
-          <MetricRow label="KUV" value={data.ps}/>
-          <MetricRow label="ROE" value={data.roe}/>
-          <MetricRow label="Verschuldung" value={data.debt}/>
-          <MetricRow label="Cashflow" value={data.cashflow}/>
-          <MetricRow label="RSI" value={data.rsi}/>
+<div className="flex justify-between items-center">
 
-        </div>
-      )}
+<h1 className="text-3xl font-bold">📈 Aktiencheck</h1>
 
-      <footer className="text-xs text-zinc-500 mt-12">
-        Diese Analyse wird automatisch erstellt. Fehler sind möglich.
-        Keine Anlageberatung.
-      </footer>
+<ThemeToggle/>
 
-    </main>
-  )
+</div>
+
+<SearchBar onSearch={searchStock}/>
+
+{data && (
+
+<div className="space-y-3">
+
+<MetricRow
+label="KGV"
+value={data.pe}
+score={evaluatePE(data.pe)}
+/>
+
+<MetricRow
+label="KUV"
+value={data.ps}
+score={evaluatePS(data.ps)}
+/>
+
+<MetricRow
+label="ROE"
+value={data.roe}
+score={evaluateROE(data.roe)}
+/>
+
+<MetricRow
+label="Verschuldung"
+value={data.debt}
+score={evaluateDebt(data.debt)}
+/>
+
+<MetricRow
+label="RSI"
+value={data.rsi}
+score={evaluateRSI(data.rsi)}
+/>
+
+<MetricRow
+label="Cashflow"
+value={data.cashflow}
+score={data.cashflow > 0 ? "good" : "bad"}
+/>
+
+<div className="mt-6 p-4 bg-blue-100 dark:bg-blue-900 rounded">
+
+<p className="font-semibold">
+
+Gesamtscore: {calculateScore(data)} / 5
+
+</p>
+
+</div>
+
+</div>
+
+)}
+
+<footer className="text-xs text-zinc-500 pt-10">
+
+Diese Analyse wird automatisch erstellt. Fehler sind möglich. Keine Anlageberatung.
+
+</footer>
+
+</main>
+
+)
+
 }
