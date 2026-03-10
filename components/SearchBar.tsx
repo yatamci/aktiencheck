@@ -9,31 +9,32 @@ interface Suggestion {
 }
 
 interface SearchBarProps {
-  onSearch: (symbol: string, name: string) => void
+  onSearch: (symbol: string) => void
   loading: boolean
 }
 
 export default function SearchBar({ onSearch, loading }: SearchBarProps) {
-  const [query, setQuery] = useState('')
+  const [query,       setQuery]       = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(-1)
-  const [fetching, setFetching] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [open,        setOpen]        = useState(false)
+  const [activeIdx,   setActiveIdx]   = useState(-1)
+  const [fetching,    setFetching]    = useState(false)
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
+  // Fetch suggestions with debounce
   const fetchSuggestions = useCallback(async (q: string) => {
-    if (q.length < 1) { setSuggestions([]); return }
     setFetching(true)
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
-      const data: Suggestion[] = await res.json()
-      setSuggestions(Array.isArray(data) ? data : [])
-      setShowDropdown(true)
-      setActiveIndex(-1)
+      const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+      const json = await res.json()
+      const list = Array.isArray(json) ? json : []
+      setSuggestions(list)
+      setOpen(list.length > 0)
+      setActiveIdx(-1)
     } catch {
       setSuggestions([])
+      setOpen(false)
     } finally {
       setFetching(false)
     }
@@ -41,97 +42,73 @@ export default function SearchBar({ onSearch, loading }: SearchBarProps) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (!query.trim()) { setSuggestions([]); setShowDropdown(false); return }
-    debounceRef.current = setTimeout(() => fetchSuggestions(query), 280)
+    if (!query.trim()) { setSuggestions([]); setOpen(false); return }
+    debounceRef.current = setTimeout(() => fetchSuggestions(query.trim()), 300)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [query, fetchSuggestions])
 
   // Close on outside click
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowDropdown(false)
-      }
+    const handler = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  function selectSuggestion(s: Suggestion) {
-    setQuery(s.name)
+  function pick(s: Suggestion) {
+    setQuery(`${s.name} (${s.symbol})`)
     setSuggestions([])
-    setShowDropdown(false)
-    onSearch(s.symbol, s.name)
+    setOpen(false)
+    onSearch(s.symbol)
   }
 
-  function handleSubmit() {
-    if (!query.trim()) return
-    const active = activeIndex >= 0 ? suggestions[activeIndex] : null
-    if (active) {
-      selectSuggestion(active)
-    } else {
-      setShowDropdown(false)
-      onSearch(query.trim(), query.trim())
-    }
+  function submit() {
+    if (!query.trim() || loading) return
+    const active = activeIdx >= 0 ? suggestions[activeIdx] : null
+    if (active) { pick(active); return }
+    setOpen(false)
+    // If input looks like a pure ticker (e.g. "AAPL"), use as-is; otherwise pass full string
+    onSearch(query.trim())
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (!showDropdown || suggestions.length === 0) {
-      if (e.key === 'Enter') handleSubmit()
-      return
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setActiveIndex((i) => Math.max(i - 1, -1))
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      handleSubmit()
-    } else if (e.key === 'Escape') {
-      setShowDropdown(false)
-      setActiveIndex(-1)
-    }
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter')     { e.preventDefault(); submit(); return }
+    if (e.key === 'Escape')    { setOpen(false); return }
+    if (!open) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, suggestions.length - 1)) }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, -1)) }
   }
 
   return (
-    <div className="search-wrapper" ref={containerRef}>
-      <div className={`search-container${showDropdown && suggestions.length > 0 ? ' search-container--open' : ''}`}>
+    <div ref={containerRef} className="search-wrapper">
+      <div className="search-container">
         <input
-          ref={inputRef}
           type="text"
           className="search-input"
           placeholder="Aktie suchen – z.B. Apple, AAPL, Tesla, SAP …"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={onKey}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
           disabled={loading}
           autoComplete="off"
-          autoCorrect="off"
           spellCheck={false}
         />
-        {fetching && (
-          <div className="search-spinner" />
-        )}
-        <button
-          className="search-button"
-          onClick={handleSubmit}
-          disabled={loading || !query.trim()}
-        >
+        {fetching && <div className="search-spinner" />}
+        <button className="search-button" onClick={submit} disabled={loading || !query.trim()}>
           {loading ? 'Lädt …' : 'Analysieren'}
         </button>
       </div>
 
-      {showDropdown && suggestions.length > 0 && (
+      {open && suggestions.length > 0 && (
         <div className="dropdown">
           {suggestions.map((s, i) => (
             <button
               key={s.symbol}
-              className={`dropdown-item${i === activeIndex ? ' dropdown-item--active' : ''}`}
-              onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s) }}
-              onMouseEnter={() => setActiveIndex(i)}
+              className={`dropdown-item${i === activeIdx ? ' dropdown-item--active' : ''}`}
+              onMouseDown={e => { e.preventDefault(); pick(s) }}
+              onMouseEnter={() => setActiveIdx(i)}
             >
               <span className="dropdown-symbol">{s.symbol}</span>
               <span className="dropdown-name">{s.name}</span>
