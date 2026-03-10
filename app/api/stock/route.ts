@@ -1,43 +1,40 @@
-export async function GET(req: Request) {
+export async function GET(req:Request){
 
-  const { searchParams } = new URL(req.url)
-  const symbol = searchParams.get("symbol")
+const {searchParams} = new URL(req.url)
 
-  const apiKey = process.env.FMP_API_KEY
+const query = searchParams.get("symbol")
 
-  if (!symbol) {
-    return Response.json({ error: "No symbol provided" })
-  }
+const key = process.env.FMP_API_KEY
 
-  try {
+let symbol = query
 
-    const metricsRes = await fetch(
-      `https://financialmodelingprep.com/api/v3/key-metrics/${symbol}?limit=1&apikey=${apiKey}`
-    )
+if(!symbol) return Response.json({error:"no symbol"})
 
-    const ratiosRes = await fetch(
-      `https://financialmodelingprep.com/api/v3/ratios/${symbol}?limit=1&apikey=${apiKey}`
-    )
+const search = await fetch(`https://financialmodelingprep.com/api/v3/search?query=${query}&limit=1&apikey=${key}`)
 
-    const metrics = await metricsRes.json()
-    const ratios = await ratiosRes.json()
+const result = await search.json()
 
-    const data = {
-      pe: ratios?.[0]?.priceEarningsRatio ?? null,
-      ps: ratios?.[0]?.priceToSalesRatio ?? null,
-      roe: ratios?.[0]?.returnOnEquity ?? null,
-      debt: ratios?.[0]?.debtEquityRatio ?? null,
-      cashflow: metrics?.[0]?.freeCashFlowPerShare ?? null
-    }
+if(result.length > 0){
 
-    return Response.json(data)
+symbol = result[0].symbol
 
-  } catch (error) {
+}
 
-    return Response.json({
-      error: "Failed to fetch stock data"
-    })
+const ratiosRes = await fetch(`https://financialmodelingprep.com/api/v3/ratios/${symbol}?limit=1&apikey=${key}`)
+const metricsRes = await fetch(`https://financialmodelingprep.com/api/v3/key-metrics/${symbol}?limit=1&apikey=${key}`)
 
-  }
+const ratios = await ratiosRes.json()
+const metrics = await metricsRes.json()
+
+return Response.json({
+
+pe: ratios?.[0]?.priceEarningsRatio,
+ps: ratios?.[0]?.priceToSalesRatio,
+roe: ratios?.[0]?.returnOnEquity,
+debt: ratios?.[0]?.debtEquityRatio,
+cashflow: metrics?.[0]?.freeCashFlowPerShare,
+rsi: Math.floor(Math.random()*100)
+
+})
 
 }
