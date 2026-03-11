@@ -245,14 +245,15 @@ body {
   .metrics-grid {
     grid-template-columns: 1fr 1fr;
     gap: 0 16px;
-    align-items: start;
+    align-items: stretch; /* cols same height so spacer can flex */
   }
 }
 .grid-col       { display: flex; flex-direction: column; }
 .category-section { }
-/* Push Technische Analyse down so RSI aligns with Nettomarge */
-.grid-col:last-child .category-section:last-child { margin-top: auto; padding-top: 16px; }
-.grid-col:last-child .category-section:last-child .section-title { margin-top: 0; }
+/* Spacer that fills available space, pushing Technische Analyse (RSI) down */
+.rsi-spacer       { flex: 1; min-height: 8px; }
+/* On mobile spacer collapses */
+@media (max-width: 719px) { .rsi-spacer { display: none; } }
 
 .metrics-col    { display: flex; flex-direction: column; gap: 6px; }
 
