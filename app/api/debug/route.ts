@@ -5,23 +5,23 @@ export async function GET(req: NextRequest) {
   const key    = process.env.FMP_API_KEY
   if (!key) return NextResponse.json({ error: 'FMP_API_KEY not set' })
 
+  const results: Record<string, unknown> = { symbol, keyOk: true }
+
   const tests: Record<string, string> = {
-    // New v4 endpoints
-    profile_v4:      `https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${key}`,
-    search_v4:       `https://financialmodelingprep.com/stable/search?query=${symbol}&apikey=${key}`,
-    ratios_v4:       `https://financialmodelingprep.com/stable/ratios-ttm?symbol=${symbol}&apikey=${key}`,
-    metrics_v4:      `https://financialmodelingprep.com/stable/key-metrics-ttm?symbol=${symbol}&apikey=${key}`,
-    history_v4:      `https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${symbol}&apikey=${key}`,
-    // Try v3 stable
-    profile_v3:      `https://financialmodelingprep.com/api/v3/profile/${symbol}?apikey=${key}`,
+    profile:     `https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${key}`,
+    ratios_ttm:  `https://financialmodelingprep.com/stable/ratios-ttm?symbol=${symbol}&apikey=${key}`,
+    metrics_ttm: `https://financialmodelingprep.com/stable/key-metrics-ttm?symbol=${symbol}&apikey=${key}`,
+    rsi:         `https://financialmodelingprep.com/stable/technical-indicator/daily?symbol=${symbol}&type=rsi&period=14&apikey=${key}`,
+    fx:          `https://financialmodelingprep.com/stable/fx-quotes?symbol=EURUSD&apikey=${key}`,
   }
 
-  const results: Record<string, unknown> = { symbol, keyPreview: key.slice(0,6)+'****' }
   for (const [name, url] of Object.entries(tests)) {
     try {
       const r = await fetch(url, { cache: 'no-store' })
-      const text = await r.text()
-      results[name] = { status: r.status, preview: text.slice(0, 200) }
+      const json = await r.json()
+      // Show all keys of first result so we know exact field names
+      const first = Array.isArray(json) ? json[0] : json
+      results[name] = { status: r.status, keys: first ? Object.keys(first) : [], sample: JSON.stringify(first).slice(0, 300) }
     } catch (e) { results[name] = { error: String(e) } }
   }
   return NextResponse.json(results)
