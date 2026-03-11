@@ -1,29 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Helper – fetch one FMP endpoint, return parsed JSON or null
 async function fmp(endpoint: string, key: string): Promise<unknown> {
   const sep = endpoint.includes('?') ? '&' : '?'
   const url = `https://financialmodelingprep.com/api/v3/${endpoint}${sep}apikey=${key}`
   try {
     const r = await fetch(url, { cache: 'no-store' })
-    if (!r.ok) {
-      console.error(`FMP ${endpoint} → HTTP ${r.status}`)
-      return null
-    }
+    if (!r.ok) return null
     const json = await r.json()
-    // FMP returns {"Error Message":"..."} on bad key / plan
-    if (json && typeof json === 'object' && !Array.isArray(json) && (json as Record<string,unknown>)['Error Message']) {
-      console.error(`FMP error on ${endpoint}:`, (json as Record<string,unknown>)['Error Message'])
-      return null
-    }
+    if (json && !Array.isArray(json) && json['Error Message']) return null
     return json
-  } catch (e) {
-    console.error(`FMP fetch error on ${endpoint}:`, e)
-    return null
-  }
+  } catch { return null }
 }
 
-// Safely pick first element if array, else return as object
 function first(v: unknown): Record<string, unknown> {
   if (!v) return {}
   if (Array.isArray(v)) return (v[0] ?? {}) as Record<string, unknown>
@@ -31,7 +19,6 @@ function first(v: unknown): Record<string, unknown> {
   return {}
 }
 
-// Get a number, trying multiple key names
 function num(obj: Record<string, unknown>, ...keys: string[]): number | null {
   for (const k of keys) {
     const v = obj[k]
@@ -45,9 +32,9 @@ export async function GET(req: NextRequest) {
   const key   = process.env.FMP_API_KEY
 
   if (!query) return NextResponse.json({ error: 'Kein Symbol angegeben.' }, { status: 400 })
-  if (!key)   return NextResponse.json({ error: 'FMP_API_KEY nicht gesetzt.' }, { status: 500 })
+  if (!key)   return NextResponse.json({ error: 'API-Key fehlt. Bitte FMP_API_KEY in Vercel → Settings → Environment Variables setzen und neu deployen.' }, { status: 500 })
 
-  // ── Step 1: resolve symbol ──────────────────────────────────────
+  // 1. Resolve ticker from name or symbol
   let ticker = query.toUpperCase()
   let resolvedName = query
 
@@ -57,7 +44,7 @@ export async function GET(req: NextRequest) {
     resolvedName = String(searchResult[0].name   ?? query)
   }
 
-  // ── Step 2: fetch all data (sequential to avoid free-plan rate limit) ──
+  // 2. Parallel fetch
   const [rttmRaw, rannRaw, mttmRaw, mannRaw, profileRaw, growthRaw, techRaw, histRaw] =
     await Promise.all([
       fmp(`ratios-ttm/${ticker}`, key),
@@ -77,84 +64,79 @@ export async function GET(req: NextRequest) {
   const p    = first(profileRaw)
   const g    = first(growthRaw)
   const t    = first(techRaw)
-
   const historical: { date: string; close: number }[] =
     (histRaw as Record<string,unknown>)?.historical as { date: string; close: number }[] ?? []
 
-  // ── Step 3: helpers ─────────────────────────────────────────────
   const rv = (...keys: string[]) => num(rttm, ...keys) ?? num(rann, ...keys)
   const mv = (...keys: string[]) => num(mttm, ...keys) ?? num(mann, ...keys)
 
-  // ── Step 4: MA50 / MA200 ────────────────────────────────────────
-  // historical comes newest-first → reverse to oldest-first
+  // 3. MA50 / MA200
   const closesAsc = [...historical].reverse().map(d => d.close)
   const datesAsc  = [...historical].reverse().map(d => d.date)
 
   function sma(arr: number[], period: number): (number | null)[] {
     return arr.map((_, i) =>
-      i + 1 < period
-        ? null
+      i + 1 < period ? null
         : arr.slice(i + 1 - period, i + 1).reduce((s, v) => s + v, 0) / period
     )
   }
 
   const ma50arr  = sma(closesAsc, 50)
   const ma200arr = sma(closesAsc, 200)
-
   const chartData = datesAsc.map((date, i) => ({
-    date,
-    close: closesAsc[i] ?? null,
-    ma50:  ma50arr[i]   ?? null,
-    ma200: ma200arr[i]  ?? null,
+    date, close: closesAsc[i] ?? null, ma50: ma50arr[i] ?? null, ma200: ma200arr[i] ?? null,
   }))
 
   const last   = closesAsc.length - 1
   const ma50L  = last >= 0 ? (ma50arr[last]  ?? null) : null
   const ma200L = last >= 0 ? (ma200arr[last] ?? null) : null
-
   let crossSignal: 'golden' | 'death' | 'none' = 'none'
-  if (ma50L !== null && ma200L !== null) {
-    crossSignal = ma50L > ma200L ? 'golden' : 'death'
-  }
+  if (ma50L !== null && ma200L !== null) crossSignal = ma50L > ma200L ? 'golden' : 'death'
 
-  // ── Step 5: return ──────────────────────────────────────────────
+  // 4. Company description helpers
+  const founded = p.ipoDate ? String(p.ipoDate).slice(0, 4) : null
+  const country = p.country ? String(p.country) : null
+  const city    = p.city    ? String(p.city)    : null
+  const hq      = [city, country].filter(Boolean).join(', ') || null
+  const employees = typeof p.fullTimeEmployees === 'number'
+    ? p.fullTimeEmployees.toLocaleString('de-DE')
+    : typeof p.fullTimeEmployees === 'string' ? p.fullTimeEmployees : null
+  const description = p.description ? String(p.description) : null
+  // Shorten description to ~300 chars
+  const shortDesc = description
+    ? (description.length > 300 ? description.slice(0, 300).replace(/\s\S+$/, '') + ' …' : description)
+    : null
+
   return NextResponse.json({
-    name:     String(p.companyName ?? resolvedName),
-    symbol:   ticker,
-    sector:   p.sector   ? String(p.sector)   : null,
-    industry: p.industry ? String(p.industry) : null,
-    price:    typeof p.price   === 'number' ? p.price   : null,
-    currency: typeof p.currency=== 'string' ? p.currency: 'USD',
+    name:        String(p.companyName ?? resolvedName),
+    symbol:      ticker,
+    sector:      p.sector   ? String(p.sector)   : null,
+    industry:    p.industry ? String(p.industry) : null,
+    price:       typeof p.price    === 'number' ? p.price    : null,
+    currency:    typeof p.currency === 'string' ? p.currency : 'USD',
+    // Company info for header card
+    description: shortDesc,
+    founded,
+    hq,
+    employees,
+    ceo:         p.ceo ? String(p.ceo) : null,
+    website:     p.website ? String(p.website) : null,
 
-    // Bewertung
-    pe: rv('peRatioTTM',           'priceEarningsRatio'),
-    ps: rv('priceToSalesRatioTTM', 'priceToSalesRatio'),
-    pb: rv('priceToBookRatioTTM',  'priceToBookRatio'),
-
-    // Rentabilität
-    roe:             rv('returnOnEquityTTM',        'returnOnEquity'),
-    roa:             rv('returnOnAssetsTTM',        'returnOnAssets'),
-    grossMargin:     rv('grossProfitMarginTTM',     'grossProfitMargin'),
-    operatingMargin: rv('operatingProfitMarginTTM', 'operatingProfitMargin'),
-    netMargin:       rv('netProfitMarginTTM',       'netProfitMargin'),
-
-    // Liquidität & Verschuldung
-    cashflow:     mv('freeCashFlowPerShareTTM', 'freeCashFlowPerShare'),
-    debt:         rv('debtEquityRatioTTM',      'debtEquityRatio'),
-    currentRatio: rv('currentRatioTTM',         'currentRatio'),
-
-    // Technisch
-    rsi: typeof t.rsi === 'number' ? t.rsi : null,
-
-    // Dividende & Wachstum
-    dividendYield:  rv('dividendYieldTTM',  'dividendYield'),
+    pe:             rv('peRatioTTM',            'priceEarningsRatio'),
+    ps:             rv('priceToSalesRatioTTM',  'priceToSalesRatio'),
+    pb:             rv('priceToBookRatioTTM',   'priceToBookRatio'),
+    roe:            rv('returnOnEquityTTM',     'returnOnEquity'),
+    roa:            rv('returnOnAssetsTTM',     'returnOnAssets'),
+    grossMargin:    rv('grossProfitMarginTTM',  'grossProfitMargin'),
+    operatingMargin:rv('operatingProfitMarginTTM','operatingProfitMargin'),
+    netMargin:      rv('netProfitMarginTTM',    'netProfitMargin'),
+    cashflow:       mv('freeCashFlowPerShareTTM','freeCashFlowPerShare'),
+    debt:           rv('debtEquityRatioTTM',    'debtEquityRatio'),
+    currentRatio:   rv('currentRatioTTM',       'currentRatio'),
+    rsi:            typeof t.rsi === 'number' ? t.rsi : null,
+    dividendYield:  rv('dividendYieldTTM',      'dividendYield'),
     revenueGrowth:  typeof g.revenueGrowth   === 'number' ? g.revenueGrowth   : null,
     earningsGrowth: typeof g.netIncomeGrowth === 'number' ? g.netIncomeGrowth : null,
-
-    // Chart
-    chartData,
-    crossSignal,
-    ma50Latest:  ma50L,
-    ma200Latest: ma200L,
+    chartData, crossSignal, ma50Latest: ma50L, ma200Latest: ma200L,
   })
 }
