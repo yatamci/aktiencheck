@@ -14,6 +14,12 @@ export interface StockData {
   industry?: string
   price?: number | null
   currency?: string
+  description?: string | null
+  founded?: string | null
+  hq?: string | null
+  employees?: string | null
+  ceo?: string | null
+  website?: string | null
 
   pe?: number | null
   ps?: number | null
