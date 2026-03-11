@@ -215,22 +215,6 @@ body {
 /* ────────────────────────────────────────────
    Stock Header
 ──────────────────────────────────────────── */
-.stock-header {
-  padding: 22px 26px; margin-bottom: 14px;
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
-}
-.stock-identity   { display: flex; flex-direction: column; gap: 6px; }
-.stock-name       { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
-.stock-meta       { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.stock-symbol     {
-  font-family: 'DM Mono', monospace; font-size: 0.77rem; font-weight: 600;
-  color: var(--accent); background: var(--accent-bg); padding: 3px 10px; border-radius: 999px;
-}
-.stock-sector     { font-size: 0.8rem; color: var(--text-2); }
-.stock-industry   { font-size: 0.8rem; color: var(--text-3); }
-.stock-price      { text-align: right; }
-.price-value      { font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 600; color: var(--text); }
-.price-label      { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
 
 /* ────────────────────────────────────────────
    Legend
@@ -413,3 +397,42 @@ body {
 .stagger > *:nth-child(6)  { animation-delay: 0.18s }
 .stagger > *:nth-child(7)  { animation-delay: 0.21s }
 .stagger > *:nth-child(8)  { animation-delay: 0.24s }
+
+/* ────────────────────────────────────────────
+   Stock Header – restructured with company info
+──────────────────────────────────────────── */
+.stock-header       { padding: 22px 24px 20px; margin-bottom: 14px; }
+.stock-header-top   { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.stock-identity     { display: flex; flex-direction: column; gap: 6px; }
+.stock-name         { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+.stock-meta         { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stock-symbol       { font-family: 'DM Mono', monospace; font-size: 0.77rem; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 3px 10px; border-radius: 999px; }
+.stock-sector       { font-size: 0.8rem; color: var(--text-2); }
+.stock-price        { text-align: right; flex-shrink: 0; }
+.price-value        { font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 600; color: var(--text); }
+.price-label        { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
+
+/* Company info block */
+.company-info       { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.company-desc       { font-size: 0.82rem; color: var(--text-2); line-height: 1.6; }
+.company-facts      { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.company-fact       { font-size: 0.76rem; color: var(--text-3); white-space: nowrap; }
+
+@media (min-width: 720px) {
+  .company-info     { flex-direction: row; gap: 20px; align-items: flex-start; }
+  .company-desc     { flex: 1; }
+  .company-facts    { flex-direction: column; gap: 4px; flex-shrink: 0; min-width: 180px; align-items: flex-end; }
+  .company-fact     { text-align: right; }
+}
+
+/* ────────────────────────────────────────────
+   Error hint code style
+──────────────────────────────────────────── */
+.error-hint code {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  background: var(--accent-bg);
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
