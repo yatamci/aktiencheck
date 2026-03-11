@@ -49,46 +49,50 @@ function str(obj: Record<string, unknown>, ...keys: string[]): string | null {
   return null
 }
 
-// Smart ticker resolution: try multiple strategies to find the right stock
+// Smart ticker resolution
 async function resolveTicker(query: string, key: string): Promise<{ ticker: string; name: string; rateLimited: boolean }> {
   const q = query.trim()
+  const major = ['NASDAQ','NYSE','XETRA','LSE','HKG','SHH','SHZ','EURONEXT','AMEX','TSX','ASX']
 
-  // Strategy 1: search with the query as-is
-  const { data: raw1, status: s1 } = await fmp(`search?query=${encodeURIComponent(q)}&limit=10`, key)
-  if (s1 !== 200 && s1 !== 0) return { ticker: q.toUpperCase(), name: q, rateLimited: isRateLimited(raw1) }
-
-  const results1 = Array.isArray(raw1) ? raw1 as Record<string,unknown>[] : []
-
-  if (results1.length > 0) {
-    // Prefer: exact symbol match (case-insensitive)
-    const exactSym = results1.find(s => String(s.symbol ?? '').toUpperCase() === q.toUpperCase())
-    if (exactSym) return { ticker: String(exactSym.symbol), name: String(exactSym.name ?? q), rateLimited: false }
-
-    // Prefer: major exchanges (NASDAQ, NYSE, XETRA, LSE, HKG, SHH, SHZ)
-    const majorExchanges = ['NASDAQ','NYSE','XETRA','LSE','HKG','SHH','SHZ','EURONEXT','AMEX']
-    const onMajor = results1.find(s => majorExchanges.includes(String(s.exchangeShortName ?? '').toUpperCase()))
-    if (onMajor) return { ticker: String(onMajor.symbol), name: String(onMajor.name ?? q), rateLimited: false }
-
-    // Prefer: name contains query words (e.g. "Apple" → "Apple Inc.")
-    const queryLower = q.toLowerCase()
-    const nameMatch = results1.find(s => String(s.name ?? '').toLowerCase().includes(queryLower))
-    if (nameMatch) return { ticker: String(nameMatch.symbol), name: String(nameMatch.name ?? q), rateLimited: false }
-
-    // Fall back to first result
-    const first = results1[0]
-    return { ticker: String(first.symbol ?? q.toUpperCase()), name: String(first.name ?? q), rateLimited: false }
+  function pickBest(results: Record<string,unknown>[], q: string): { ticker: string; name: string } | null {
+    if (!results.length) return null
+    // 1. Exact symbol match
+    const sym = results.find(s => String(s.symbol ?? '').toUpperCase() === q.toUpperCase())
+    if (sym) return { ticker: String(sym.symbol), name: String(sym.name ?? q) }
+    // 2. On major exchange
+    const maj = results.find(s => major.includes(String(s.exchangeShortName ?? '').toUpperCase()))
+    if (maj) return { ticker: String(maj.symbol), name: String(maj.name ?? q) }
+    // 3. Name starts with query (best name match)
+    const ql = q.toLowerCase()
+    const starts = results.find(s => String(s.name ?? '').toLowerCase().startsWith(ql))
+    if (starts) return { ticker: String(starts.symbol), name: String(starts.name ?? q) }
+    // 4. Name contains query
+    const contains = results.find(s => String(s.name ?? '').toLowerCase().includes(ql))
+    if (contains) return { ticker: String(contains.symbol), name: String(contains.name ?? q) }
+    // 5. First result
+    return { ticker: String(results[0].symbol ?? q.toUpperCase()), name: String(results[0].name ?? q) }
   }
 
-  // Strategy 2: if no results, try searching just the first word (for "Xiaomi Corp" → "Xiaomi")
-  const firstWord = q.split(/\s+/)[0]
-  if (firstWord.length > 2 && firstWord !== q) {
-    const { data: raw2 } = await fmp(`search?query=${encodeURIComponent(firstWord)}&limit=10`, key)
-    const results2 = Array.isArray(raw2) ? raw2 as Record<string,unknown>[] : []
-    if (results2.length > 0) {
-      const best = results2[0]
-      return { ticker: String(best.symbol ?? q.toUpperCase()), name: String(best.name ?? q), rateLimited: false }
-    }
+  // Fetch: both name-search and symbol-search in parallel for speed
+  const [nameRes, symRes] = await Promise.all([
+    fmp(`search?query=${encodeURIComponent(q)}&limit=10`, key),
+    fmp(`search?query=${encodeURIComponent(q.toUpperCase())}&limit=10`, key),
+  ])
+
+  if (isRateLimited(nameRes.data)) return { ticker: q.toUpperCase(), name: q, rateLimited: true }
+
+  const nameArr = Array.isArray(nameRes.data) ? nameRes.data as Record<string,unknown>[] : []
+  const symArr  = Array.isArray(symRes.data)  ? symRes.data  as Record<string,unknown>[] : []
+  // Merge, deduplicate by symbol
+  const seen = new Set<string>()
+  const all: Record<string,unknown>[] = []
+  for (const r of [...nameArr, ...symArr]) {
+    const s = String(r.symbol ?? '')
+    if (!seen.has(s)) { seen.add(s); all.push(r) }
   }
+
+  const best = pickBest(all, q)
+  if (best) return { ...best, rateLimited: false }
 
   return { ticker: q.toUpperCase(), name: q, rateLimited: false }
 }
@@ -177,10 +181,26 @@ export async function GET(req: NextRequest) {
 
   // 5. Company info
   const companyName = str(p, 'companyName', 'name') ?? resolvedName
-  const rawDesc     = str(p, 'description')
-  const shortDesc   = rawDesc
-    ? (rawDesc.length > 380 ? rawDesc.slice(0, 380).replace(/\s\S+$/, '') + ' …' : rawDesc)
-    : null
+  const rawDesc  = str(p, 'description')
+  // Cut at sentence boundary: find last '. ' or '.' before ~380 chars
+  let shortDesc: string | null = null
+  if (rawDesc) {
+    if (rawDesc.length <= 380) {
+      shortDesc = rawDesc
+    } else {
+      // Find last sentence ending (". ") within first 380 chars
+      const chunk = rawDesc.slice(0, 420)
+      // Split by sentence endings, keep complete sentences up to ~380 chars
+      const sentenceEnd = /[.!?](?:\s|$)/g
+      let lastEnd = -1
+      let match: RegExpExecArray | null
+      while ((match = sentenceEnd.exec(chunk)) !== null) {
+        if (match.index <= 380) lastEnd = match.index + 1
+        else break
+      }
+      shortDesc = lastEnd > 0 ? rawDesc.slice(0, lastEnd).trim() : rawDesc.slice(0, 380).trim()
+    }
+  }
 
   // 6. Price + EUR conversion
   const priceOrig = num(p, 'price')
