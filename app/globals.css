@@ -250,6 +250,8 @@ body {
 }
 .grid-col       { display: flex; flex-direction: column; }
 .category-section { }
+/* Spacer between right-col categories to push Technische Analyse down */
+.grid-col:last-child .category-section:last-child .section-title { margin-top: 48px; }
 
 .metrics-col    { display: flex; flex-direction: column; gap: 6px; }
 
@@ -301,6 +303,7 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0;
+  margin-top: 4px;
 }
 @media (min-width: 720px) {
   .bottom-grid {
@@ -309,6 +312,9 @@ body {
     align-items: start;
   }
 }
+/* Make overall-card fill height to align with chart */
+.bottom-grid > div { display: flex; flex-direction: column; }
+.bottom-grid .overall-card { flex: 1; }
 
 /* ────────────────────────────────────────────
    MA Chart
