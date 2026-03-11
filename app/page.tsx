@@ -60,7 +60,12 @@ function CompanyInfo({ data }: { data: StockData }) {
 
   return (
     <div className="company-info">
-      {data.description && <p className="company-desc">{data.description}</p>}
+      {data.description && (
+        <div>
+          <p className="company-desc">{data.description}</p>
+          <p className="company-desc-note">ℹ️ Beschreibung von FMP (Englisch)</p>
+        </div>
+      )}
       {facts.length > 0 && (
         <div className="company-facts">
           {facts.map((f, i) => <span key={i} className="company-fact">{f}</span>)}
@@ -148,8 +153,16 @@ export default function Home() {
               {data.price != null && (
                 <div className="stock-price">
                   <div className="price-value">
-                    {data.currency === 'EUR' ? '€' : '$'}
-                    {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {data.priceEur != null && data.currency !== 'EUR' && (
+                      <span className="price-orig">
+                        {data.currency === 'USD' ? '$' : data.currency === 'GBP' ? '£' : (data.currency + ' ')}
+                        {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {' | '}
+                      </span>
+                    )}
+                    <span className="price-eur">
+                      €{Number(data.priceEur ?? data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </div>
                   <div className="price-label">Aktueller Kurs</div>
                 </div>
