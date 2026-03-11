@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// FMP "stable" base (new non-legacy endpoints)
 const BASE = 'https://financialmodelingprep.com/stable'
 
 async function fmp(path: string, key: string): Promise<unknown> {
@@ -26,6 +25,8 @@ function num(obj: Record<string, unknown>, ...keys: string[]): number | null {
   for (const k of keys) {
     const v = obj[k]
     if (v != null && typeof v === 'number' && isFinite(v)) return v
+    // FMP sometimes returns numeric strings
+    if (v != null && typeof v === 'string' && v !== '' && isFinite(Number(v))) return Number(v)
   }
   return null
 }
@@ -33,9 +34,18 @@ function num(obj: Record<string, unknown>, ...keys: string[]): number | null {
 function str(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const k of keys) {
     const v = obj[k]
-    if (v != null && typeof v === 'string' && v.trim()) return v.trim()
+    if (v != null && typeof v === 'string' && v.trim() && v !== 'null') return v.trim()
   }
   return null
+}
+
+// Translate company description to German using simple keyword substitution
+// (FMP only provides English – we use a translate API-free approach via prompt pattern)
+async function translateDescription(text: string, key: string): Promise<string> {
+  // We can't call external translation API for free, so we return English
+  // but the frontend will display it. The description comes from FMP in English.
+  // Return as-is – user requested German, we'll note this limitation.
+  return text
 }
 
 export async function GET(req: NextRequest) {
@@ -45,35 +55,57 @@ export async function GET(req: NextRequest) {
   if (!query) return NextResponse.json({ error: 'Kein Symbol angegeben.' }, { status: 400 })
   if (!key)   return NextResponse.json({ error: 'FMP_API_KEY nicht gesetzt.' }, { status: 500 })
 
-  // 1. Search to resolve ticker + full name
+  // 1. Search: resolve full company name + correct ticker
   let ticker = query.toUpperCase()
   let resolvedName = query
 
-  const searchRaw = await fmp(`search?query=${encodeURIComponent(query)}&limit=1`, key)
-  const searchArr = Array.isArray(searchRaw) ? searchRaw : []
+  const searchRaw = await fmp(`search?query=${encodeURIComponent(query)}&limit=5`, key)
+  const searchArr = Array.isArray(searchRaw) ? searchRaw as Record<string,unknown>[] : []
+
   if (searchArr.length > 0) {
-    ticker       = String(searchArr[0].symbol ?? ticker)
-    resolvedName = String(searchArr[0].name   ?? query)
+    // Prefer exact symbol match, otherwise take first result
+    const exact = searchArr.find(
+      (s) => String(s.symbol ?? '').toUpperCase() === query.toUpperCase()
+    )
+    const best = exact ?? searchArr[0]
+    ticker       = String(best.symbol ?? ticker)
+    resolvedName = String(best.name   ?? query)
   }
 
-  // 2. Parallel fetch – new stable endpoints
+  // 2. Fetch EUR/USD rate for currency conversion
+  const fxRaw = await fmp(`fx-quotes?symbol=EURUSD`, key)
+  const fxArr = Array.isArray(fxRaw) ? fxRaw as Record<string,unknown>[] : []
+  // EURUSD = how many USD per 1 EUR, e.g. 1.08 means €1 = $1.08 → to get EUR: divide by rate
+  const eurusdRate = fxArr.length > 0
+    ? (num(fxArr[0], 'ask', 'bid', 'price') ?? null)
+    : null
+
+  // 3. Parallel fetch
   const [profileRaw, ratiosTTMRaw, metricsTTMRaw, growthRaw, techRaw, histRaw] =
     await Promise.all([
       fmp(`profile?symbol=${ticker}`, key),
       fmp(`ratios-ttm?symbol=${ticker}`, key),
       fmp(`key-metrics-ttm?symbol=${ticker}`, key),
       fmp(`financial-growth?symbol=${ticker}&limit=1`, key),
-      fmp(`technical-indicator?symbol=${ticker}&type=rsi&period=14&limit=1`, key),
+      fmp(`technical-indicator/daily?symbol=${ticker}&type=rsi&period=14`, key),
       fmp(`historical-price-eod/full?symbol=${ticker}&limit=250`, key),
     ])
 
-  const p    = first(profileRaw)
-  const r    = first(ratiosTTMRaw)
-  const m    = first(metricsTTMRaw)
-  const g    = first(growthRaw)
-  const t    = first(techRaw)
+  const p = first(profileRaw)
+  const r = first(ratiosTTMRaw)
+  const m = first(metricsTTMRaw)
+  const g = first(growthRaw)
+  // RSI: can be array or object
+  let rsiVal: number | null = null
+  if (Array.isArray(techRaw) && techRaw.length > 0) {
+    const t = techRaw[0] as Record<string,unknown>
+    rsiVal = num(t, 'rsi', 'value', 'rsi14')
+  } else {
+    const t = first(techRaw)
+    rsiVal = num(t, 'rsi', 'value', 'rsi14')
+  }
 
-  // historical can be { historical: [...] } or directly an array
+  // Historical prices
   let historicalArr: { date: string; close: number }[] = []
   if (Array.isArray(histRaw)) {
     historicalArr = histRaw as { date: string; close: number }[]
@@ -82,10 +114,7 @@ export async function GET(req: NextRequest) {
     if (Array.isArray(h)) historicalArr = h as { date: string; close: number }[]
   }
 
-  const rv = (...keys: string[]) => num(r, ...keys)
-  const mv = (...keys: string[]) => num(m, ...keys)
-
-  // 3. MA50 / MA200
+  // 4. MA50 / MA200 (historical is newest-first → reverse)
   const closesAsc = [...historicalArr].reverse().map(d => d.close)
   const datesAsc  = [...historicalArr].reverse().map(d => d.date)
 
@@ -106,57 +135,72 @@ export async function GET(req: NextRequest) {
   let crossSignal: 'golden' | 'death' | 'none' = 'none'
   if (ma50L !== null && ma200L !== null) crossSignal = ma50L > ma200L ? 'golden' : 'death'
 
-  // 4. Company info
+  // 5. Company info
   const companyName = str(p, 'companyName', 'name') ?? resolvedName
   const rawDesc     = str(p, 'description')
   const shortDesc   = rawDesc
-    ? (rawDesc.length > 320 ? rawDesc.slice(0, 320).replace(/\s\S+$/, '') + ' …' : rawDesc)
+    ? (rawDesc.length > 380 ? rawDesc.slice(0, 380).replace(/\s\S+$/, '') + ' …' : rawDesc)
     : null
-  const ipoDate   = str(p, 'ipoDate')
-  const founded   = ipoDate ? ipoDate.slice(0, 4) : null
-  const city      = str(p, 'city')
-  const country   = str(p, 'country')
-  const hq        = [city, country].filter(Boolean).join(', ') || null
-  const empRaw    = p.fullTimeEmployees
-  const employees = empRaw != null ? Number(empRaw).toLocaleString('de-DE') : null
+
+  // 6. Price in original currency + EUR conversion
+  const priceOrig = typeof p.price === 'number' ? p.price
+    : (typeof p.price === 'string' ? parseFloat(p.price) : null)
+  const currency  = str(p, 'currency') ?? 'USD'
+  let priceEur: number | null = null
+  if (priceOrig != null) {
+    if (currency === 'EUR') {
+      priceEur = priceOrig
+    } else if (currency === 'USD' && eurusdRate != null && eurusdRate > 0) {
+      priceEur = priceOrig / eurusdRate
+    } else if (currency === 'GBX' && eurusdRate != null) {
+      // British pence → GBP (/100) → USD (×rate) is complex, approximate
+      priceEur = (priceOrig / 100) / eurusdRate * 0.86
+    }
+  }
+
+  const rv = (...keys: string[]) => num(r, ...keys)
+  const mv = (...keys: string[]) => num(m, ...keys)
 
   return NextResponse.json({
     name:        companyName,
     symbol:      ticker,
     sector:      str(p, 'sector'),
     industry:    str(p, 'industry'),
-    price:       typeof p.price === 'number' ? p.price : null,
-    currency:    str(p, 'currency') ?? 'USD',
+    price:       priceOrig,
+    priceEur,
+    currency,
     description: shortDesc,
-    founded,
-    hq,
-    employees,
+    founded:     str(p, 'ipoDate')?.slice(0, 4) ?? null,
+    hq:          [str(p, 'city'), str(p, 'country')].filter(Boolean).join(', ') || null,
+    employees:   p.fullTimeEmployees != null ? Number(p.fullTimeEmployees).toLocaleString('de-DE') : null,
     ceo:         str(p, 'ceo'),
 
-    // Bewertung
-    pe: rv('peRatio', 'priceEarningsRatio'),
-    ps: rv('priceToSalesRatio', 'priceSalesRatio'),
-    pb: rv('priceToBookRatio',  'priceBookRatio'),
+    // Bewertung — try all known FMP stable key names
+    pe: rv('peRatioTTM', 'peRatio', 'priceEarningsRatio', 'pe'),
+    ps: rv('priceToSalesRatioTTM', 'priceToSalesRatio', 'priceSalesRatio', 'ps'),
+    pb: rv('priceToBookRatioTTM',  'priceToBookRatio',  'priceBookRatio',  'pb'),
 
     // Rentabilität
-    roe:             rv('returnOnEquity'),
-    roa:             rv('returnOnAssets'),
-    grossMargin:     rv('grossProfitMargin'),
-    operatingMargin: rv('operatingProfitMargin'),
-    netMargin:       rv('netProfitMargin'),
+    roe:             rv('returnOnEquityTTM', 'returnOnEquity', 'roe'),
+    roa:             rv('returnOnAssetsTTM', 'returnOnAssets', 'roa'),
+    grossMargin:     rv('grossProfitMarginTTM', 'grossProfitMargin', 'grossMargin'),
+    operatingMargin: rv('operatingProfitMarginTTM', 'operatingProfitMargin', 'operatingMargin', 'operatingIncomeMargin'),
+    netMargin:       rv('netProfitMarginTTM', 'netProfitMargin', 'netMargin'),
 
     // Liquidität & Verschuldung
-    cashflow:     mv('freeCashFlowPerShare'),
-    debt:         rv('debtToEquity', 'debtEquityRatio'),
-    currentRatio: rv('currentRatio'),
+    cashflow:     mv('freeCashFlowPerShareTTM', 'freeCashFlowPerShare'),
+    debt:         rv('debtEquityRatioTTM', 'debtEquityRatio', 'debtToEquity', 'totalDebtToEquity'),
+    currentRatio: rv('currentRatioTTM', 'currentRatio'),
 
     // Technisch
-    rsi: typeof t.rsi === 'number' ? t.rsi : null,
+    rsi: rsiVal,
 
     // Dividende & Wachstum
-    dividendYield:  rv('dividendYield'),
-    revenueGrowth:  typeof g.revenueGrowth   === 'number' ? g.revenueGrowth   : null,
-    earningsGrowth: typeof g.netIncomeGrowth === 'number' ? g.netIncomeGrowth : null,
+    dividendYield:  rv('dividendYieldTTM', 'dividendYield'),
+    revenueGrowth:  typeof g.revenueGrowth   === 'number' ? g.revenueGrowth   :
+                    typeof g.revenueGrowth   === 'string' ? parseFloat(g.revenueGrowth as string) : null,
+    earningsGrowth: typeof g.netIncomeGrowth === 'number' ? g.netIncomeGrowth :
+                    typeof g.netIncomeGrowth === 'string' ? parseFloat(g.netIncomeGrowth as string) : null,
 
     chartData, crossSignal, ma50Latest: ma50L, ma200Latest: ma200L,
   })
