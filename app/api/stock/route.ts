@@ -1,120 +1,157 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Helper – fetch one FMP endpoint, return parsed JSON or null
+async function fmp(endpoint: string, key: string): Promise<unknown> {
+  const sep = endpoint.includes('?') ? '&' : '?'
+  const url = `https://financialmodelingprep.com/api/v3/${endpoint}${sep}apikey=${key}`
+  try {
+    const r = await fetch(url, { cache: 'no-store' })
+    if (!r.ok) {
+      console.error(`FMP ${endpoint} → HTTP ${r.status}`)
+      return null
+    }
+    const json = await r.json()
+    // FMP returns {"Error Message":"..."} on bad key / plan
+    if (json && typeof json === 'object' && !Array.isArray(json) && (json as Record<string,unknown>)['Error Message']) {
+      console.error(`FMP error on ${endpoint}:`, (json as Record<string,unknown>)['Error Message'])
+      return null
+    }
+    return json
+  } catch (e) {
+    console.error(`FMP fetch error on ${endpoint}:`, e)
+    return null
+  }
+}
+
+// Safely pick first element if array, else return as object
+function first(v: unknown): Record<string, unknown> {
+  if (!v) return {}
+  if (Array.isArray(v)) return (v[0] ?? {}) as Record<string, unknown>
+  if (typeof v === 'object') return v as Record<string, unknown>
+  return {}
+}
+
+// Get a number, trying multiple key names
+function num(obj: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const v = obj[k]
+    if (v != null && typeof v === 'number' && isFinite(v)) return v
+  }
+  return null
+}
+
 export async function GET(req: NextRequest) {
-  const symbol = new URL(req.url).searchParams.get('symbol') ?? ''
-  const key    = process.env.FMP_API_KEY
+  const query = (new URL(req.url).searchParams.get('symbol') ?? '').trim()
+  const key   = process.env.FMP_API_KEY
 
-  if (!symbol.trim()) return NextResponse.json({ error: 'Kein Symbol angegeben.' }, { status: 400 })
-  if (!key)           return NextResponse.json({ error: 'FMP_API_KEY fehlt in den Umgebungsvariablen.' }, { status: 500 })
+  if (!query) return NextResponse.json({ error: 'Kein Symbol angegeben.' }, { status: 400 })
+  if (!key)   return NextResponse.json({ error: 'FMP_API_KEY nicht gesetzt.' }, { status: 500 })
 
-  const get = async (path: string) => {
-    try {
-      const r = await fetch(`https://financialmodelingprep.com/api/v3/${path}&apikey=${key}`)
-      if (!r.ok) return null
-      return await r.json()
-    } catch { return null }
+  // ── Step 1: resolve symbol ──────────────────────────────────────
+  let ticker = query.toUpperCase()
+  let resolvedName = query
+
+  const searchResult = await fmp(`search?query=${encodeURIComponent(query)}&limit=1`, key)
+  if (Array.isArray(searchResult) && searchResult.length > 0) {
+    ticker       = String(searchResult[0].symbol ?? ticker)
+    resolvedName = String(searchResult[0].name   ?? query)
   }
 
-  // 1. Resolve ticker
-  const searchData = await get(`search?query=${encodeURIComponent(symbol)}&limit=1`)
-  let ticker = symbol.toUpperCase().trim()
-  let resolvedName = symbol
-
-  if (Array.isArray(searchData) && searchData.length > 0) {
-    ticker       = searchData[0].symbol
-    resolvedName = searchData[0].name
-  }
-
-  // 2. Fetch all in parallel
+  // ── Step 2: fetch all data (sequential to avoid free-plan rate limit) ──
   const [rttmRaw, rannRaw, mttmRaw, mannRaw, profileRaw, growthRaw, techRaw, histRaw] =
     await Promise.all([
-      get(`ratios-ttm/${ticker}?`),
-      get(`ratios/${ticker}?limit=1&`),
-      get(`key-metrics-ttm/${ticker}?`),
-      get(`key-metrics/${ticker}?limit=1&`),
-      get(`profile/${ticker}?`),
-      get(`financial-growth/${ticker}?limit=1&`),
-      get(`technical_indicator/daily/${ticker}?period=14&type=rsi&limit=1&`),
-      get(`historical-price-full/${ticker}?timeseries=250&`),
+      fmp(`ratios-ttm/${ticker}`, key),
+      fmp(`ratios/${ticker}?limit=1`, key),
+      fmp(`key-metrics-ttm/${ticker}`, key),
+      fmp(`key-metrics/${ticker}?limit=1`, key),
+      fmp(`profile/${ticker}`, key),
+      fmp(`financial-growth/${ticker}?limit=1`, key),
+      fmp(`technical_indicator/daily/${ticker}?period=14&type=rsi&limit=1`, key),
+      fmp(`historical-price-full/${ticker}?timeseries=250`, key),
     ])
 
-  // Normalise responses
-  const rttm: Record<string, number> = Array.isArray(rttmRaw) ? (rttmRaw[0] ?? {}) : (rttmRaw ?? {})
-  const rann: Record<string, number> = Array.isArray(rannRaw) ? (rannRaw[0] ?? {}) : {}
-  const mttm: Record<string, number> = Array.isArray(mttmRaw) ? (mttmRaw[0] ?? {}) : (mttmRaw ?? {})
-  const mann: Record<string, number> = Array.isArray(mannRaw) ? (mannRaw[0] ?? {}) : {}
-  const p    = Array.isArray(profileRaw) ? (profileRaw[0] ?? {}) : (profileRaw ?? {})
-  const g: Record<string, number>    = Array.isArray(growthRaw) ? (growthRaw[0] ?? {}) : {}
-  const t: Record<string, number>    = Array.isArray(techRaw)   ? (techRaw[0]   ?? {}) : {}
-  const historical: { date: string; close: number }[] = histRaw?.historical ?? []
+  const rttm = first(rttmRaw)
+  const rann = first(rannRaw)
+  const mttm = first(mttmRaw)
+  const mann = first(mannRaw)
+  const p    = first(profileRaw)
+  const g    = first(growthRaw)
+  const t    = first(techRaw)
 
-  // Prefer TTM, fall back to annual
-  const rv = (a: string, b: string): number | null => rttm[a] ?? rann[b] ?? null
-  const mv = (a: string, b: string): number | null => mttm[a] ?? mann[b] ?? null
+  const historical: { date: string; close: number }[] =
+    (histRaw as Record<string,unknown>)?.historical as { date: string; close: number }[] ?? []
 
-  // Compute MA50 / MA200 (oldest→newest)
-  const closesAsc = [...historical].reverse().map((d) => d.close)
+  // ── Step 3: helpers ─────────────────────────────────────────────
+  const rv = (...keys: string[]) => num(rttm, ...keys) ?? num(rann, ...keys)
+  const mv = (...keys: string[]) => num(mttm, ...keys) ?? num(mann, ...keys)
+
+  // ── Step 4: MA50 / MA200 ────────────────────────────────────────
+  // historical comes newest-first → reverse to oldest-first
+  const closesAsc = [...historical].reverse().map(d => d.close)
+  const datesAsc  = [...historical].reverse().map(d => d.date)
 
   function sma(arr: number[], period: number): (number | null)[] {
     return arr.map((_, i) =>
-      i + 1 < period ? null
+      i + 1 < period
+        ? null
         : arr.slice(i + 1 - period, i + 1).reduce((s, v) => s + v, 0) / period
     )
   }
+
   const ma50arr  = sma(closesAsc, 50)
   const ma200arr = sma(closesAsc, 200)
 
-  const datesAsc = [...historical].reverse().map((d) => d.date)
   const chartData = datesAsc.map((date, i) => ({
     date,
-    close:  closesAsc[i] ?? null,
-    ma50:   ma50arr[i]   ?? null,
-    ma200:  ma200arr[i]  ?? null,
+    close: closesAsc[i] ?? null,
+    ma50:  ma50arr[i]   ?? null,
+    ma200: ma200arr[i]  ?? null,
   }))
 
   const last   = closesAsc.length - 1
-  const ma50L  = ma50arr[last]  ?? null
-  const ma200L = ma200arr[last] ?? null
-  const ma50P  = last > 0 ? (ma50arr[last - 1]  ?? null) : null
-  const ma200P = last > 0 ? (ma200arr[last - 1] ?? null) : null
+  const ma50L  = last >= 0 ? (ma50arr[last]  ?? null) : null
+  const ma200L = last >= 0 ? (ma200arr[last] ?? null) : null
 
   let crossSignal: 'golden' | 'death' | 'none' = 'none'
-  if (ma50L != null && ma200L != null) {
+  if (ma50L !== null && ma200L !== null) {
     crossSignal = ma50L > ma200L ? 'golden' : 'death'
-    // Refine: only "fresh" cross if it happened in last 10 bars
-    if (ma50P != null && ma200P != null) {
-      const justCrossedGolden = ma50L > ma200L && ma50P <= ma200P
-      const justCrossedDeath  = ma50L < ma200L && ma50P >= ma200P
-      if (!justCrossedGolden && !justCrossedDeath) {
-        crossSignal = ma50L > ma200L ? 'golden' : 'death'
-      }
-    }
   }
 
+  // ── Step 5: return ──────────────────────────────────────────────
   return NextResponse.json({
-    name:     p.companyName  ?? resolvedName,
+    name:     String(p.companyName ?? resolvedName),
     symbol:   ticker,
-    sector:   p.sector       ?? null,
-    industry: p.industry     ?? null,
-    price:    p.price        ?? null,
-    currency: p.currency     ?? 'USD',
+    sector:   p.sector   ? String(p.sector)   : null,
+    industry: p.industry ? String(p.industry) : null,
+    price:    typeof p.price   === 'number' ? p.price   : null,
+    currency: typeof p.currency=== 'string' ? p.currency: 'USD',
 
-    pe:             rv('peRatioTTM',            'priceEarningsRatio'),
-    ps:             rv('priceToSalesRatioTTM',  'priceToSalesRatio'),
-    pb:             rv('priceToBookRatioTTM',   'priceToBookRatio'),
-    roe:            rv('returnOnEquityTTM',     'returnOnEquity'),
-    roa:            rv('returnOnAssetsTTM',     'returnOnAssets'),
-    grossMargin:    rv('grossProfitMarginTTM',  'grossProfitMargin'),
-    operatingMargin:rv('operatingProfitMarginTTM','operatingProfitMargin'),
-    netMargin:      rv('netProfitMarginTTM',    'netProfitMargin'),
-    cashflow:       mv('freeCashFlowPerShareTTM','freeCashFlowPerShare'),
-    debt:           rv('debtEquityRatioTTM',    'debtEquityRatio'),
-    currentRatio:   rv('currentRatioTTM',       'currentRatio'),
-    rsi:            t.rsi             ?? null,
-    dividendYield:  rv('dividendYieldTTM','dividendYield'),
-    revenueGrowth:  g.revenueGrowth   ?? null,
-    earningsGrowth: g.netIncomeGrowth ?? null,
+    // Bewertung
+    pe: rv('peRatioTTM',           'priceEarningsRatio'),
+    ps: rv('priceToSalesRatioTTM', 'priceToSalesRatio'),
+    pb: rv('priceToBookRatioTTM',  'priceToBookRatio'),
 
+    // Rentabilität
+    roe:             rv('returnOnEquityTTM',        'returnOnEquity'),
+    roa:             rv('returnOnAssetsTTM',        'returnOnAssets'),
+    grossMargin:     rv('grossProfitMarginTTM',     'grossProfitMargin'),
+    operatingMargin: rv('operatingProfitMarginTTM', 'operatingProfitMargin'),
+    netMargin:       rv('netProfitMarginTTM',       'netProfitMargin'),
+
+    // Liquidität & Verschuldung
+    cashflow:     mv('freeCashFlowPerShareTTM', 'freeCashFlowPerShare'),
+    debt:         rv('debtEquityRatioTTM',      'debtEquityRatio'),
+    currentRatio: rv('currentRatioTTM',         'currentRatio'),
+
+    // Technisch
+    rsi: typeof t.rsi === 'number' ? t.rsi : null,
+
+    // Dividende & Wachstum
+    dividendYield:  rv('dividendYieldTTM',  'dividendYield'),
+    revenueGrowth:  typeof g.revenueGrowth   === 'number' ? g.revenueGrowth   : null,
+    earningsGrowth: typeof g.netIncomeGrowth === 'number' ? g.netIncomeGrowth : null,
+
+    // Chart
     chartData,
     crossSignal,
     ma50Latest:  ma50L,
