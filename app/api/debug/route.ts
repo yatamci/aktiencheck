@@ -1,30 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  const symbol = new URL(req.url).searchParams.get('symbol') ?? 'AAPL'
+  const symbol = (new URL(req.url).searchParams.get('symbol') ?? 'AAPL').trim()
   const key    = process.env.FMP_API_KEY
 
-  if (!key) return NextResponse.json({ error: 'FMP_API_KEY not set in env' })
-
-  const results: Record<string, unknown> = { symbol, keyPresent: true, keyLength: key.length }
-
-  const tests: Record<string, string> = {
-    search:    `https://financialmodelingprep.com/api/v3/search?query=${symbol}&limit=3&apikey=${key}`,
-    ratiosTTM: `https://financialmodelingprep.com/api/v3/ratios-ttm/${symbol}?apikey=${key}`,
-    ratiosAnn: `https://financialmodelingprep.com/api/v3/ratios/${symbol}?limit=1&apikey=${key}`,
-    profile:   `https://financialmodelingprep.com/api/v3/profile/${symbol}?apikey=${key}`,
-    history:   `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?timeseries=10&apikey=${key}`,
+  const result: Record<string, unknown> = {
+    timestamp:   new Date().toISOString(),
+    symbol,
+    keyPresent:  !!key,
+    keyLength:   key?.length ?? 0,
+    keyPreview:  key ? key.slice(0, 4) + '****' : 'NOT SET',
   }
 
-  for (const [name, url] of Object.entries(tests)) {
-    try {
-      const r    = await fetch(url)
-      const text = await r.text()
-      results[name] = { status: r.status, body: text.slice(0, 400) }
-    } catch (e) {
-      results[name] = { fetchError: String(e) }
+  if (!key) {
+    result.diagnosis = 'FMP_API_KEY is not set. Go to Vercel → Project → Settings → Environment Variables and add FMP_API_KEY. Then redeploy.'
+    return NextResponse.json(result)
+  }
+
+  // Test one simple endpoint
+  try {
+    const url = `https://financialmodelingprep.com/api/v3/profile/${symbol}?apikey=${key}`
+    result.testUrl = url.replace(key, key.slice(0,4) + '****')
+    const r = await fetch(url, { cache: 'no-store' })
+    const text = await r.text()
+    result.httpStatus = r.status
+    result.responsePreview = text.slice(0, 500)
+
+    if (text.includes('Error Message')) {
+      result.diagnosis = 'FMP returned an error – likely invalid API key or plan limitation.'
+    } else if (r.status === 200 && text.startsWith('[')) {
+      result.diagnosis = 'API key works! Data is being returned correctly.'
+    } else {
+      result.diagnosis = 'Unexpected response. Check responsePreview above.'
     }
+  } catch (e) {
+    result.fetchError = String(e)
+    result.diagnosis  = 'Network error fetching FMP. This could be a Vercel network issue.'
   }
 
-  return NextResponse.json(results, { headers: { 'Content-Type': 'application/json' } })
+  return NextResponse.json(result)
 }
