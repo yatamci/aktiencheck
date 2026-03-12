@@ -38,7 +38,7 @@ export default function MAChart({ data, crossSignal, ma50Latest, ma200Latest, cu
     const bgColor    = isDark ? 'transparent'               : 'transparent'
     const textColor  = isDark ? 'rgba(180,200,255,0.7)'     : 'rgba(30,40,60,0.75)'
     const gridColor  = isDark ? 'rgba(255,255,255,0.06)'    : 'rgba(0,0,0,0.09)'
-    const closeColor = isDark ? 'rgba(255,255,255,0.22)'    : 'rgba(30,50,100,0.35)'
+    const closeColor = isDark ? 'rgba(200,215,255,0.3)'     : 'rgba(20,30,60,0.7)'
     const ma50Color  = isDark ? '#4d9fff'                   : '#1a6fcc'   // darker blue in light
     const ma200Color = isDark ? '#ff9500'                   : '#c47000'   // darker orange in light
 
@@ -161,6 +161,7 @@ export default function MAChart({ data, crossSignal, ma50Latest, ma200Latest, cu
       <div ref={containerRef} className="ma-chart-canvas-wrap">
         <canvas ref={canvasRef} />
       </div>
+      <p className="ma-chart-xaxis-label">← Datum (MM-TT)</p>
 
       <div className="ma-chart-legend">
         <div className="ma-legend-item">
