@@ -165,16 +165,26 @@ export default function Home() {
               {data.price != null && (
                 <div className="stock-price">
                   <div className="price-value">
+                    {/* Only show EUR if we have a real converted value AND it differs from original */}
                     {data.priceEur != null && data.currency !== 'EUR' && (
-                      <span className="price-orig">
-                        {data.currency === 'USD' ? '$' : data.currency === 'GBP' ? '£' : data.currency + '\u00a0'}
+                      <>
+                        <span className="price-orig">
+                          {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {' '}{data.currency}
+                        </span>
+                        <span className="price-sep">{' | '}</span>
+                        <span className="price-eur">
+                          {Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {' €'}
+                        </span>
+                      </>
+                    )}
+                    {(data.currency === 'EUR' || data.priceEur == null) && (
+                      <span className="price-eur">
                         {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        <span className="price-sep"> | </span>
+                        {' '}{data.currency ?? ''}
                       </span>
                     )}
-                    <span className="price-eur">
-                      €{Number(data.priceEur ?? data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
                   </div>
                   <div className="price-label">Aktueller Kurs</div>
                 </div>
