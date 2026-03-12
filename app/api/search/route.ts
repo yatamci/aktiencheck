@@ -1,88 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Fast local lookup for common names
-const NAME_MAP: Record<string,{ symbol: string; name: string; exchange: string }> = {
-  'apple':              { symbol:'AAPL',      name:'Apple Inc.',               exchange:'NASDAQ' },
-  'microsoft':          { symbol:'MSFT',      name:'Microsoft Corporation',    exchange:'NASDAQ' },
-  'google':             { symbol:'GOOGL',     name:'Alphabet Inc.',            exchange:'NASDAQ' },
-  'alphabet':           { symbol:'GOOGL',     name:'Alphabet Inc.',            exchange:'NASDAQ' },
-  'amazon':             { symbol:'AMZN',      name:'Amazon.com Inc.',          exchange:'NASDAQ' },
-  'tesla':              { symbol:'TSLA',      name:'Tesla Inc.',               exchange:'NASDAQ' },
-  'meta':               { symbol:'META',      name:'Meta Platforms Inc.',      exchange:'NASDAQ' },
-  'facebook':           { symbol:'META',      name:'Meta Platforms Inc.',      exchange:'NASDAQ' },
-  'nvidia':             { symbol:'NVDA',      name:'NVIDIA Corporation',       exchange:'NASDAQ' },
-  'netflix':            { symbol:'NFLX',      name:'Netflix Inc.',             exchange:'NASDAQ' },
-  'xiaomi':             { symbol:'1810.HK',   name:'Xiaomi Corporation',       exchange:'HKG'    },
-  'sap':                { symbol:'SAP',       name:'SAP SE',                   exchange:'NYSE'   },
-  'volkswagen':         { symbol:'VOW3.DE',   name:'Volkswagen AG',            exchange:'XETRA'  },
-  'bmw':                { symbol:'BMW.DE',    name:'BMW AG',                   exchange:'XETRA'  },
-  'mercedes':           { symbol:'MBG.DE',    name:'Mercedes-Benz Group AG',   exchange:'XETRA'  },
-  'siemens':            { symbol:'SIE.DE',    name:'Siemens AG',               exchange:'XETRA'  },
-  'adidas':             { symbol:'ADS.DE',    name:'adidas AG',                exchange:'XETRA'  },
-  'bayer':              { symbol:'BAYN.DE',   name:'Bayer AG',                 exchange:'XETRA'  },
-  'basf':               { symbol:'BAS.DE',    name:'BASF SE',                  exchange:'XETRA'  },
-  'allianz':            { symbol:'ALV.DE',    name:'Allianz SE',               exchange:'XETRA'  },
-  'lufthansa':          { symbol:'LHA.DE',    name:'Deutsche Lufthansa AG',    exchange:'XETRA'  },
-  'deutsche telekom':   { symbol:'DTE.DE',    name:'Deutsche Telekom AG',      exchange:'XETRA'  },
-  'alibaba':            { symbol:'BABA',      name:'Alibaba Group',            exchange:'NYSE'   },
-  'berkshire':          { symbol:'BRK.B',     name:'Berkshire Hathaway',       exchange:'NYSE'   },
-  'jpmorgan':           { symbol:'JPM',       name:'JPMorgan Chase',           exchange:'NYSE'   },
-  'visa':               { symbol:'V',         name:'Visa Inc.',                exchange:'NYSE'   },
-  'mastercard':         { symbol:'MA',        name:'Mastercard Inc.',          exchange:'NYSE'   },
-  'walmart':            { symbol:'WMT',       name:'Walmart Inc.',             exchange:'NYSE'   },
-  'disney':             { symbol:'DIS',       name:'The Walt Disney Company',  exchange:'NYSE'   },
-  'boeing':             { symbol:'BA',        name:'Boeing Company',           exchange:'NYSE'   },
-  'asml':               { symbol:'ASML',      name:'ASML Holding N.V.',        exchange:'NASDAQ' },
-  'lvmh':               { symbol:'MC.PA',     name:'LVMH Moët Hennessy',       exchange:'EURONEXT'},
-  'airbus':             { symbol:'AIR.PA',    name:'Airbus SE',                exchange:'EURONEXT'},
-  'ferrari':            { symbol:'RACE',      name:'Ferrari N.V.',             exchange:'NYSE'   },
-  'coinbase':           { symbol:'COIN',      name:'Coinbase Global Inc.',     exchange:'NASDAQ' },
-  'paypal':             { symbol:'PYPL',      name:'PayPal Holdings Inc.',     exchange:'NASDAQ' },
-}
-
 export async function GET(req: NextRequest) {
   const q   = (new URL(req.url).searchParams.get('q') ?? '').trim()
   const key = process.env.FMP_API_KEY
   if (!q || !key) return NextResponse.json([])
 
-  const ql = q.toLowerCase().replace(/\s+/g, ' ')
+  const ql    = q.toLowerCase()
+  const major = ['NASDAQ','NYSE','XETRA','LSE','HKG','EURONEXT','AMEX','SHH','SHZ','TSX','ASX']
 
-  // 1. Local name map: find all matches where name starts with query
-  const localMatches = Object.entries(NAME_MAP)
-    .filter(([name]) => name.startsWith(ql) || ql.startsWith(name))
-    .map(([, v]) => v)
+  // Score a result row
+  function score(row: Record<string,unknown>): number {
+    let s = 0
+    const name = String(row.name ?? '').toLowerCase()
+    const sym  = String(row.symbol ?? '').toUpperCase()
+    const exch = String(row.exchangeShortName ?? '').toUpperCase()
+    if (sym === q.toUpperCase()) s += 100          // exact symbol match
+    if (name === ql) s += 90                        // exact name match
+    if (name.startsWith(ql)) s += 60               // name starts with query
+    if (name.includes(' ' + ql)) s += 40           // word in name matches
+    if (name.includes(ql)) s += 20                 // name contains query
+    if (major.includes(exch)) s += 15              // prefer major exchanges
+    if (!sym.includes('.')) s += 5                 // prefer clean symbols
+    return s
+  }
 
-  // 2. FMP search in parallel
   try {
-    const url = `https://financialmodelingprep.com/stable/search?query=${encodeURIComponent(q)}&limit=10&apikey=${key}`
-    const r   = await fetch(url, { cache: 'no-store' })
-    const raw = r.ok ? await r.json() : []
-    const data: Record<string,unknown>[] = Array.isArray(raw) ? raw : []
+    // Fetch from FMP with larger limit for better coverage
+    const url  = `https://financialmodelingprep.com/stable/search?query=${encodeURIComponent(q)}&limit=20&apikey=${key}`
+    const r    = await fetch(url, { cache: 'no-store' })
+    if (!r.ok) return NextResponse.json([])
+    const raw  = await r.json()
+    if (!Array.isArray(raw)) return NextResponse.json([])
 
-    const major = ['NASDAQ','NYSE','XETRA','LSE','HKG','EURONEXT','AMEX']
-    const sorted = [
-      ...data.filter(s => major.includes(String(s.exchangeShortName ?? '').toUpperCase())),
-      ...data.filter(s => !major.includes(String(s.exchangeShortName ?? '').toUpperCase())),
-    ]
-
-    const apiResults = sorted
+    const rows = raw as Record<string,unknown>[]
+    const scored = rows
       .filter(s => s.symbol && s.name)
+      .map(s => ({ ...s, _score: score(s) }))
+      .sort((a, b) => b._score - a._score)
+
+    // Deduplicate: same company listed on multiple exchanges → keep highest scored
+    const seen = new Map<string, typeof scored[0]>()
+    for (const row of scored) {
+      // Key = first 3 chars of name (catches "Apple Inc." vs "Apple Inc")
+      const nameKey = String(row.name ?? '').toLowerCase().slice(0, 12)
+      if (!seen.has(nameKey) || seen.get(nameKey)!._score < row._score) {
+        seen.set(nameKey, row)
+      }
+    }
+
+    const results = [...seen.values()]
+      .sort((a, b) => b._score - a._score)
       .slice(0, 6)
       .map(s => ({
-        symbol:   String(s.symbol),
-        name:     String(s.name),
-        exchange: String(s.exchangeShortName ?? s.exchange ?? ''),
+        symbol:   s.symbol,
+        name:     s.name,
+        exchange: s.exchangeShortName ?? s.exchange ?? '',
       }))
 
-    // Merge: local first (they're more accurate), then API, deduplicate by symbol
-    const seen = new Set<string>()
-    const merged = [...localMatches, ...apiResults].filter(s => {
-      if (seen.has(s.symbol)) return false
-      seen.add(s.symbol); return true
-    }).slice(0, 6)
+    // Also try NASDAQ screener as parallel source for better coverage
+    let nasdaqResults: typeof results = []
+    try {
+      const nasdaqUrl = `https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10&download=true&keyword=${encodeURIComponent(q)}`
+      const nr = await fetch(nasdaqUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, cache: 'no-store' })
+      const nd = await nr.json()
+      const nrows = nd?.data?.table?.rows as Record<string,unknown>[] ?? []
+      nasdaqResults = nrows
+        .filter(r => r.symbol && r.name)
+        .slice(0, 3)
+        .map(r => ({ symbol: String(r.symbol), name: String(r.name), exchange: 'NASDAQ' }))
+    } catch { /* ignore */ }
 
-    return NextResponse.json(merged.length > 0 ? merged : apiResults.slice(0, 6))
+    // Merge: deduplicate by symbol
+    const allSymbols = new Set(results.map(r => String(r.symbol)))
+    const merged = [
+      ...results,
+      ...nasdaqResults.filter(r => !allSymbols.has(String(r.symbol)))
+    ].slice(0, 6)
+
+    return NextResponse.json(merged.length ? merged : results)
   } catch {
-    return NextResponse.json(localMatches.slice(0, 6))
+    return NextResponse.json([])
   }
 }
