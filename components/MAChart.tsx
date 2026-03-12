@@ -78,7 +78,10 @@ export default function MAChart({ data, crossSignal, ma50Latest, ma200Latest, cu
     ctx.font       = '10px DM Sans, sans-serif'
     for (let i = 0; i < data.length; i += step) {
       const d = data[i]; if (!d) continue
-      ctx.fillText(d.date.slice(5), xOf(i), H - 8)
+      const months = ['Jan.','Feb.','Mär.','Apr.','Mai','Jun.','Jul.','Aug.','Sep.','Okt.','Nov.','Dez.']
+      const dt = new Date(d.date + 'T00:00:00Z')
+      const label = months[dt.getUTCMonth()] + " '" + String(dt.getUTCFullYear()).slice(2)
+      ctx.fillText(label, xOf(i), H - 8)
     }
 
     function drawLine(pts: (number | null)[], color: string, width: number, dash: number[] = []) {
@@ -161,7 +164,6 @@ export default function MAChart({ data, crossSignal, ma50Latest, ma200Latest, cu
       <div ref={containerRef} className="ma-chart-canvas-wrap">
         <canvas ref={canvasRef} />
       </div>
-      <p className="ma-chart-xaxis-label">← Datum (MM-TT)</p>
 
       <div className="ma-chart-legend">
         <div className="ma-legend-item">
