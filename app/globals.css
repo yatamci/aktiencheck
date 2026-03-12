@@ -214,7 +214,7 @@ body {
   padding: 3px 9px; border-radius: 6px; flex-shrink: 0; min-width: 54px; text-align: center;
 }
 .dropdown-name     { flex: 1; font-size: 0.88rem; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dropdown-exchange { font-size: 0.72rem; color: var(--text-3); flex-shrink: 0; }
+.dropdown-exchange { font-size: 0.72rem; color: var(--text-2); flex-shrink: 0; }
 
 /* ────────────────────────────────────────────
    Stock Header
@@ -233,7 +233,7 @@ body {
 .section-title {
   font-size: 0.68rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--text-3); padding: 0 4px;
+  color: var(--text-2); padding: 0 4px;
   margin-bottom: 8px; margin-top: 24px;
 }
 
@@ -281,7 +281,7 @@ body {
 .metric-left  { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
 .metric-info  { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .metric-label { font-size: 0.84rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.metric-description { font-size: 0.71rem; color: var(--text-3); line-height: 1.4; display: none; }
+.metric-description { font-size: 0.71rem; color: var(--text-2); line-height: 1.4; display: none; }
 @media (min-width: 480px) { .metric-description { display: block; } }
 .metric-right { flex-shrink: 0; }
 .metric-value { font-family: 'DM Mono', monospace; font-size: 0.97rem; font-weight: 600; white-space: nowrap; }
@@ -332,7 +332,7 @@ body {
 }
 .ma-chart-title   { font-size: 0.88rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .ma-chart-subtitle{ font-size: 0.71rem; color: var(--text-3); }
-.ma-chart-canvas-wrap { width: 100%; border-radius: 8px; overflow: hidden; background: var(--bg2); }
+.ma-chart-canvas-wrap { width: 100%; border-radius: 8px; overflow: hidden; background: transparent; }
 .ma-chart-legend  { display: flex; gap: 18px; margin-top: 10px; flex-wrap: wrap; }
 .ma-legend-item   { display: flex; align-items: center; gap: 7px; font-size: 0.75rem; color: var(--text-2); }
 .ma-legend-line   { display: inline-block; width: 22px; height: 2px; border-radius: 2px; flex-shrink: 0; }
@@ -419,7 +419,7 @@ body {
 .stock-name         { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .stock-meta         { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stock-symbol       { font-family: 'DM Mono', monospace; font-size: 0.77rem; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 3px 10px; border-radius: 999px; }
-.stock-sector       { font-size: 0.8rem; color: var(--text-2); }
+.stock-sector       { font-size: 0.8rem; color: var(--text-2); font-weight: 500; }
 .stock-price        { text-align: right; flex-shrink: 0; }
 .price-value        { font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 600; color: var(--text); }
 .price-label        { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
@@ -428,7 +428,7 @@ body {
 .company-info       { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
 .company-desc       { font-size: 0.82rem; color: var(--text-2); line-height: 1.6; }
 .company-facts      { display: flex; flex-wrap: wrap; gap: 6px 14px; }
-.company-fact       { font-size: 0.76rem; color: var(--text-3); white-space: nowrap; }
+.company-fact       { font-size: 0.76rem; color: var(--text-2); white-space: nowrap; }
 
 @media (min-width: 720px) {
   .company-info     { flex-direction: row; gap: 24px; align-items: flex-start; }
@@ -457,3 +457,12 @@ body {
 
 /* ── Description language note ── */
 .company-desc-note { font-size: 0.68rem; color: var(--text-3); font-style: italic; margin-top: 4px; }
+
+/* ── MA Chart x-axis label ── */
+.ma-chart-xaxis-label {
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--text-2);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}
