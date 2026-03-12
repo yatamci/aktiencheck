@@ -122,28 +122,55 @@ const NAME_MAP: Record<string, string> = {
   'hermes':'RMS.PA','kering':'KER.PA',
 }
 
+function scoreResult(row: Record<string,unknown>, query: string): number {
+  const ql   = query.toLowerCase()
+  const name = String(row.name ?? '').toLowerCase()
+  const sym  = String(row.symbol ?? '').toUpperCase()
+  const exch = String(row.exchangeShortName ?? '').toUpperCase()
+  const major = ['NASDAQ','NYSE','XETRA','LSE','HKG','EURONEXT','AMEX','SHH','SHZ']
+  let s = 0
+  if (sym === query.toUpperCase()) s += 100
+  if (name === ql) s += 90
+  if (name.startsWith(ql)) s += 60
+  if (name.includes(' ' + ql)) s += 40
+  if (name.includes(ql)) s += 20
+  if (major.includes(exch)) s += 15
+  if (!sym.includes('.')) s += 5
+  return s
+}
+
 async function resolveTicker(query: string, fmpKey: string): Promise<string> {
-  const ql = query.toLowerCase().trim().replace(/[^a-z0-9\s.]/g, '')
-  // 1. Local map
+  const q  = query.trim()
+  const ql = q.toLowerCase().replace(/[^a-z0-9\s.]/g, '')
+
+  // 1. Local name map (instant, no API)
   for (const [n, t] of Object.entries(NAME_MAP)) {
     if (ql === n || ql.startsWith(n + ' ') || n.startsWith(ql)) return t
   }
-  // 2. FMP search
-  const d = await get(`https://financialmodelingprep.com/stable/search?query=${encodeURIComponent(query)}&limit=10&apikey=${fmpKey}`)
-  if (Array.isArray(d) && d.length > 0) {
-    const major = ['NASDAQ','NYSE','XETRA','LSE','HKG','EURONEXT','AMEX']
-    const rows  = d as Record<string,unknown>[]
-    const exact = rows.find(r => String(r.symbol ?? '').toUpperCase() === query.toUpperCase())
-    if (exact) return String(exact.symbol)
-    const maj = rows.find(r => major.includes(String(r.exchangeShortName ?? '').toUpperCase()))
-    if (maj) return String(maj.symbol)
-    const nm = rows.find(r => String(r.name ?? '').toLowerCase().startsWith(ql))
-    if (nm) return String(nm.symbol)
-    return String(rows[0].symbol)
-  }
-  return query.toUpperCase()
-}
 
+  // 2. FMP search + NASDAQ screener in parallel for maximum coverage
+  const [fmpRaw, nasdaqRaw] = await Promise.all([
+    get(`https://financialmodelingprep.com/stable/search?query=${encodeURIComponent(q)}&limit=20&apikey=${fmpKey}`),
+    fetch(
+      `https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10&download=true&keyword=${encodeURIComponent(q)}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(4000) }
+    ).then(r => r.json()).catch(() => null),
+  ])
+
+  const fmpRows = Array.isArray(fmpRaw) ? fmpRaw as Record<string,unknown>[] : []
+  const nasdaqRows: Record<string,unknown>[] =
+    (nasdaqRaw as Record<string,unknown>)?.data?.table?.rows as Record<string,unknown>[] ?? []
+  const nasdaqNorm = nasdaqRows.map(r => ({ symbol: r.symbol, name: r.name, exchangeShortName: 'NASDAQ' }))
+
+  const all = [...fmpRows, ...nasdaqNorm].filter(r => r.symbol && r.name)
+  if (all.length === 0) return q.toUpperCase()
+
+  const best = all
+    .map(r => ({ r, s: scoreResult(r, q) }))
+    .sort((a, b) => b.s - a.s)[0]
+
+  return String(best.r.symbol ?? q.toUpperCase())
+}
 // ─── Source fetchers ──────────────────────────────────────────────────────────
 
 async function fromFMP(ticker: string, key: string): Promise<Partial<StockMetrics>> {
@@ -412,17 +439,56 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 4. EUR conversion
-  const fxRaw   = await get(`https://financialmodelingprep.com/stable/fx-quotes?symbol=EURUSD&apikey=${fmpKey}`)
-  const fxArr   = Array.isArray(fxRaw) ? fxRaw as Record<string,unknown>[] : []
-  const eurusd  = fxArr.length > 0 ? (num(fxArr[0],'ask','bid','price') ?? null) : null
+  // 4. EUR conversion – fetch live rate from multiple fallbacks
   const currency = result.currency ?? 'USD'
-  const rates: Record<string,number> = {
-    EUR:1, USD:eurusd?1/eurusd:1, GBP:eurusd?1/eurusd*0.86:1,
-    GBX:eurusd?0.0086/eurusd:1, HKD:eurusd?1/(eurusd*7.8):1,
-    CNY:eurusd?1/(eurusd*7.25):1, KRW:eurusd?1/(eurusd*1350):1,
+  let eurusd: number | null = null
+
+  // Try FMP first
+  const fxRaw = await get(`https://financialmodelingprep.com/stable/fx-quotes?symbol=EURUSD&apikey=${fmpKey}`)
+  const fxArr = Array.isArray(fxRaw) ? fxRaw as Record<string,unknown>[] : []
+  if (fxArr.length > 0) eurusd = num(fxArr[0],'ask','bid','price')
+
+  // Fallback: Frankfurter API (free, ECB rates, no key needed)
+  if (!eurusd) {
+    const fxFallback = await get('https://api.frankfurter.app/latest?from=EUR&to=USD')
+    const usd = (fxFallback as Record<string,unknown>)?.rates as Record<string,unknown>
+    if (usd?.USD) eurusd = num(usd,'USD')
   }
-  const priceEur = result.price != null ? result.price * (rates[currency] ?? 1/( eurusd??1)) : null
+
+  // Fallback: exchangerate.host (free)
+  if (!eurusd) {
+    const fxFallback2 = await get('https://open.er-api.com/v6/latest/EUR')
+    const rates2 = (fxFallback2 as Record<string,unknown>)?.rates as Record<string,unknown>
+    if (rates2?.USD) eurusd = num(rates2,'USD')
+  }
+
+  // eurusd = how many USD per 1 EUR (e.g. 1.08 means €1 = $1.08)
+  // To convert USD → EUR: divide by eurusd
+  let priceEur: number | null = null
+  if (result.price != null && eurusd && eurusd > 0) {
+    const toEur: Record<string,number> = {
+      EUR: 1,
+      USD: 1 / eurusd,
+      GBP: 1 / eurusd * (eurusd / 1.17), // approx GBP/EUR
+      GBX: 1 / eurusd * (eurusd / 117),  // pence
+      HKD: 1 / (eurusd * 7.8),
+      CNY: 1 / (eurusd * 7.25),
+      KRW: 1 / (eurusd * 1350),
+      JPY: 1 / (eurusd * 160),
+      CHF: 1 / (eurusd * 0.96),
+      CAD: 1 / (eurusd * 1.47),
+      AUD: 1 / (eurusd * 1.63),
+      SEK: 1 / (eurusd * 11.5),
+      NOK: 1 / (eurusd * 11.7),
+    }
+    const rate = toEur[currency]
+    // Only set priceEur if currency is NOT EUR and we have a real rate
+    if (currency !== 'EUR' && rate != null) {
+      priceEur = result.price * rate
+    }
+    // EUR stocks: priceEur === price, but we signal this by leaving priceEur null
+    // so frontend shows just the EUR price without the duplicate
+  }
 
   // 5. Description: cut at last sentence boundary ≤400 chars
   const rawDesc = result.description
