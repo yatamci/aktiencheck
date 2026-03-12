@@ -158,9 +158,12 @@ async function resolveTicker(query: string, fmpKey: string): Promise<string> {
   ])
 
   const fmpRows = Array.isArray(fmpRaw) ? fmpRaw as Record<string,unknown>[] : []
-  const nasdaqRows: Record<string,unknown>[] =
-    (nasdaqRaw as Record<string,unknown>)?.data?.table?.rows as Record<string,unknown>[] ?? []
-  const nasdaqNorm = nasdaqRows.map(r => ({ symbol: r.symbol, name: r.name, exchangeShortName: 'NASDAQ' }))
+  // Safe deep access for NASDAQ response
+  const nasdaqData  = nasdaqRaw as Record<string,unknown> | null
+  const nasdaqTable = nasdaqData?.data as Record<string,unknown> | undefined
+  const nasdaqInner = nasdaqTable?.table as Record<string,unknown> | undefined
+  const nasdaqRows  = (nasdaqInner?.rows ?? []) as Record<string,unknown>[]
+  const nasdaqNorm  = nasdaqRows.map(r => ({ symbol: r.symbol, name: r.name, exchangeShortName: 'NASDAQ' }))
 
   const all = [...fmpRows, ...nasdaqNorm].filter(r => r.symbol && r.name)
   if (all.length === 0) return q.toUpperCase()
