@@ -71,17 +71,24 @@ export default function MAChart({ data, crossSignal, ma50Latest, ma200Latest, cu
       ctx.fillText(`${currencySymbol}${val.toFixed(0)}`, PAD.left - 6, y + 4)
     }
 
-    // X labels
-    const step = Math.ceil(data.length / 5)
-    ctx.textAlign  = 'center'
-    ctx.fillStyle  = textColor
-    ctx.font       = '10px DM Sans, sans-serif'
-    for (let i = 0; i < data.length; i += step) {
+    // X labels: oldest (left) → newest (right)
+    // Pick ~5 evenly spaced indices, always include last (= today)
+    const months = ['Jan.','Feb.','Mär.','Apr.','Mai','Jun.','Jul.','Aug.','Sep.','Okt.','Nov.','Dez.']
+    const labelIndices: number[] = []
+    const numLabels = 5
+    for (let k = 0; k < numLabels; k++) {
+      labelIndices.push(Math.round(k * (data.length - 1) / (numLabels - 1)))
+    }
+    ctx.textAlign = 'center'
+    ctx.fillStyle = textColor
+    ctx.font      = '10px DM Sans, sans-serif'
+    for (const i of labelIndices) {
       const d = data[i]; if (!d) continue
-      const months = ['Jan.','Feb.','Mär.','Apr.','Mai','Jun.','Jul.','Aug.','Sep.','Okt.','Nov.','Dez.']
-      const dt = new Date(d.date + 'T00:00:00Z')
+      const dt    = new Date(d.date + 'T00:00:00Z')
       const label = months[dt.getUTCMonth()] + " '" + String(dt.getUTCFullYear()).slice(2)
-      ctx.fillText(label, xOf(i), H - 8)
+      // Clamp label x so it doesn't overflow left/right edge
+      const x = Math.max(PAD.left + 16, Math.min(PAD.left + cW - 16, xOf(i)))
+      ctx.fillText(label, x, H - 8)
     }
 
     function drawLine(pts: (number | null)[], color: string, width: number, dash: number[] = []) {
