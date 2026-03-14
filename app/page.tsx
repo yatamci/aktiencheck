@@ -22,15 +22,15 @@ const RIGHT_CATS = [
 ]
 
 function ScoreRing({ pct, color }: { pct: number; color: string }) {
-  const r = 36, circ = 2 * Math.PI * r
+  const r = 52, circ = 2 * Math.PI * r
   const offset = circ * (1 - Math.min(1, Math.max(0, pct)))
   return (
     <div className="score-ring">
-      <svg width="90" height="90" viewBox="0 0 90 90">
-        <circle cx="45" cy="45" r={r} fill="none" strokeWidth="7" stroke="var(--border)" />
-        <circle cx="45" cy="45" r={r} fill="none" strokeWidth="7" stroke={color}
+      <svg width="130" height="130" viewBox="0 0 130 130">
+        <circle cx="65" cy="65" r={r} fill="none" strokeWidth="9" stroke="var(--border)" />
+        <circle cx="65" cy="65" r={r} fill="none" strokeWidth="9" stroke={color}
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition:'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', transform:'rotate(-90deg)', transformOrigin:'45px 45px' }}
+          style={{ transition:'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', transform:'rotate(-90deg)', transformOrigin:'65px 65px' }}
         />
       </svg>
       <div className="score-ring-text">
@@ -187,6 +187,11 @@ export default function Home() {
                     )}
                   </div>
                   <div className="price-label">Aktueller Kurs</div>
+                  {data.priceDate && (
+                    <div className="price-date">
+                      Stand: {new Date(data.priceDate).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })}, {new Date(data.priceDate).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })} Uhr
+                    </div>
+                  )}
                 </div>
               )}
             </div>
