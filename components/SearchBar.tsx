@@ -42,8 +42,8 @@ export default function SearchBar({ onSearch, loading }: SearchBarProps) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (!query.trim()) { setSuggestions([]); setOpen(false); return }
-    debounceRef.current = setTimeout(() => fetchSuggestions(query.trim()), 300)
+    if (!query.trim() || query.trim().length < 1) { setSuggestions([]); setOpen(false); return }
+    debounceRef.current = setTimeout(() => fetchSuggestions(query.trim()), 150)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [query, fetchSuggestions])
 
