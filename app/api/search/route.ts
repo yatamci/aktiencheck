@@ -226,12 +226,18 @@ function scoreRow(row: { symbol: string; name: string; exchange: string }, q: st
   const sym  = row.symbol.toUpperCase()
   const exch = row.exchange.toUpperCase()
   const major = ['NASDAQ','NYSE','XETRA','LSE','HKG','EURONEXT','AMEX','SIX']
+
+  // HARD FILTER: must match symbol or name in some meaningful way
+  const symMatch  = sym.startsWith(q.toUpperCase()) || sym.includes(q.toUpperCase())
+  const nameMatch = name.startsWith(ql) || name.split(/\s+/).some(w => w.startsWith(ql)) || name.includes(ql)
+  if (!symMatch && !nameMatch) return 0   // ← strict gate: no match = score 0
+
   let s = 0
   if (sym === q.toUpperCase()) s += 200
   if (name === ql) s += 150
   if (name.startsWith(ql)) s += 100
   if (sym.startsWith(q.toUpperCase())) s += 80
-  if (name.split(/\s+/).some(w => w.startsWith(ql))) s += 60  // word boundary match
+  if (name.split(/\s+/).some(w => w.startsWith(ql))) s += 60
   if (name.includes(ql)) s += 30
   if (sym.includes(q.toUpperCase())) s += 20
   if (major.includes(exch)) s += 10
