@@ -281,8 +281,7 @@ body {
 .metric-left  { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
 .metric-info  { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .metric-label { font-size: 0.84rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.metric-description { font-size: 0.71rem; color: var(--text-2); line-height: 1.4; display: none; }
-@media (min-width: 480px) { .metric-description { display: block; } }
+.metric-description { font-size: 0.71rem; color: var(--text-2); line-height: 1.4; display: block; }
 .metric-right { flex-shrink: 0; }
 .metric-value { font-family: 'DM Mono', monospace; font-size: 0.97rem; font-weight: 600; white-space: nowrap; }
 .metric-value--good    { color: var(--good); }
