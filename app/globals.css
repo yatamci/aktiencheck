@@ -451,7 +451,8 @@ body {
 }
 
 /* ── Price display with EUR conversion ── */
-.price-orig { font-size: 0.95rem; color: var(--text-3); font-weight: 500; }
+.price-orig { font-size: 0.85rem; color: var(--text-3); font-weight: 400; }
+.price-sep  { font-size: 0.75rem; color: var(--text-3); font-weight: 300; opacity: 0.5; margin: 0 3px; }
 .price-eur  { font-size: 1.5rem; font-weight: 700; color: var(--text); }
 .price-value { display: flex; align-items: baseline; gap: 0; flex-wrap: wrap; justify-content: flex-end; }
 
