@@ -265,29 +265,81 @@ body {
    Metric Card
 ──────────────────────────────────────────── */
 .metric-card {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 13px 16px;
+  padding: 0;
   background: var(--surface);
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--border); border-radius: var(--r-sm);
   box-shadow: var(--shadow-sm);
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+  cursor: pointer; overflow: hidden;
 }
-.metric-card:hover {
-  background: var(--surface-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+.metric-card:hover { background: var(--surface-hover); box-shadow: var(--shadow-md); }
+.metric-card--open  { border-color: var(--accent); }
+
+/* Stable top row – never moves */
+.metric-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 13px 16px;
 }
 .metric-left  { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
 .metric-info  { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .metric-label { font-size: 0.84rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .metric-description { font-size: 0.71rem; color: var(--text-2); line-height: 1.4; display: block; }
-.metric-right { flex-shrink: 0; }
+.metric-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .metric-value { font-family: 'DM Mono', monospace; font-size: 0.97rem; font-weight: 600; white-space: nowrap; }
 .metric-value--good    { color: var(--good); }
 .metric-value--warn    { color: var(--warn); }
 .metric-value--bad     { color: var(--bad);  }
 .metric-value--neutral { color: var(--text-2); }
+
+/* Chevron */
+.metric-chevron { color: var(--text-3); display: flex; align-items: center; transition: transform 0.25s ease; flex-shrink: 0; }
+.metric-chevron--open { transform: rotate(180deg); }
+
+/* Expand panel */
+.metric-expand {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.metric-expand--open { grid-template-rows: 1fr; }
+.metric-expand-inner {
+  overflow: hidden;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 0 16px;
+  border-top: 0px solid var(--border);
+  transition: padding 0.28s ease, border-top-width 0.28s ease;
+}
+.metric-expand--open .metric-expand-inner {
+  padding: 12px 16px 14px;
+  border-top-width: 1px;
+}
+
+/* Detail rows inside expand */
+.metric-detail-formula,
+.metric-detail-thresholds,
+.metric-detail-interp {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.metric-detail-label {
+  font-size: 0.67rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-3);
+}
+.metric-detail-value {
+  font-size: 0.78rem; color: var(--text-2); line-height: 1.55;
+  font-family: 'DM Mono', monospace;
+}
+.metric-detail-interp .metric-detail-value {
+  font-family: 'DM Sans', sans-serif;
+}
+.metric-threshold-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+.metric-threshold-row  { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text-2); }
+.threshold-badge {
+  width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 0.62rem; font-weight: 800; flex-shrink: 0;
+}
+.threshold-good { background: var(--good); color: #fff; }
+.threshold-warn { background: var(--warn); color: #fff; }
+.threshold-bad  { background: var(--bad);  color: #fff; }
 
 /* ────────────────────────────────────────────
    Score Badge
@@ -357,10 +409,10 @@ body {
 .score-breakdown    { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .score-breakdown-row{ display: flex; align-items: center; gap: 8px; font-size: 0.77rem; color: var(--text-2); }
 .breakdown-dot      { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.score-ring         { position: relative; width: 90px; height: 90px; }
+.score-ring         { position: relative; width: 130px; height: 130px; flex-shrink: 0; }
 .score-ring-text    { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.score-ring-num     { font-family: 'DM Mono', monospace; font-size: 1.15rem; font-weight: 700; line-height: 1; }
-.score-ring-label   { font-size: 0.58rem; color: var(--text-3); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.08em; }
+.score-ring-num     { font-family: 'DM Mono', monospace; font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.score-ring-label   { font-size: 0.62rem; color: var(--text-3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
 
 /* ────────────────────────────────────────────
    Error / Loading / Empty
@@ -466,3 +518,6 @@ body {
   margin-top: 2px;
   letter-spacing: 0.04em;
 }
+
+/* ── Price date ── */
+.price-date { font-size: 0.68rem; color: var(--text-3); margin-top: 3px; font-family: 'DM Mono', monospace; text-align: right; }
