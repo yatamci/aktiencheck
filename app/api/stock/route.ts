@@ -366,6 +366,7 @@ export async function GET(req:NextRequest) {
 
   return NextResponse.json({
     name:result.name??ticker,symbol:ticker,sector:result.sector,industry:result.industry,
+    priceDate: result.hist.length > 0 ? result.hist[0].date + 'T16:00:00' : new Date().toISOString(),
     price:result.price,priceEur,currency,description:shortDesc,
     founded:result.ipoDate?.slice(0,4)??null,
     hq:[result.city,result.country].filter(Boolean).join(', ')||null,
