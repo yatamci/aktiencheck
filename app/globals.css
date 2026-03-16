@@ -249,14 +249,13 @@ body {
   .metrics-grid {
     grid-template-columns: 1fr 1fr;
     gap: 0 16px;
-    align-items: start; /* columns fully independent – expanding left won't shift right */
+    align-items: stretch; /* both columns same height */
   }
 }
 .grid-col       { display: flex; flex-direction: column; }
 .category-section { }
-/* Spacer that fills available space, pushing Technische Analyse (RSI) down */
-.rsi-spacer       { flex: 1; min-height: 8px; }
-/* On mobile spacer collapses */
+/* Spacer: grows to fill space, pushing RSI down to align with Nettomarge */
+.rsi-spacer { flex: 1; }
 @media (max-width: 719px) { .rsi-spacer { display: none; } }
 
 .metrics-col    { display: flex; flex-direction: column; gap: 6px; }
@@ -402,11 +401,11 @@ body {
 /* ────────────────────────────────────────────
    Overall Score
 ──────────────────────────────────────────── */
-.overall-card  { padding: 24px 22px; }
+.overall-card  { padding: 24px 22px; display: flex; flex-direction: column; justify-content: space-between; }
 .overall-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .overall-left h3    { font-size: 0.9rem; font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
 .overall-label      { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; }
-.score-breakdown    { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.score-breakdown    { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
 .score-breakdown-row{ display: flex; align-items: center; gap: 8px; font-size: 0.77rem; color: var(--text-2); }
 .breakdown-dot      { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .score-ring         { position: relative; width: 130px; height: 130px; flex-shrink: 0; }
@@ -465,13 +464,13 @@ body {
    Stock Header – restructured with company info
 ──────────────────────────────────────────── */
 .stock-header       { padding: 22px 24px 20px; margin-bottom: 14px; }
-.stock-header-top   { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.stock-header-top   { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-bottom: 14px; }
 .stock-identity     { display: flex; flex-direction: column; gap: 6px; }
 .stock-name         { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .stock-meta         { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stock-symbol       { font-family: 'DM Mono', monospace; font-size: 0.77rem; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 3px 10px; border-radius: 999px; }
 .stock-sector       { font-size: 0.8rem; color: var(--text-2); font-weight: 500; }
-.stock-price        { text-align: right; flex-shrink: 0; }
+.stock-price        { text-align: right; justify-self: end; }
 .price-value        { font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 600; color: var(--text); }
 .price-label        { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
 
@@ -524,8 +523,9 @@ body {
 
 /* ── Recommendation ── */
 .recommendation {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 0;
+  padding-top: 18px;
+  padding-bottom: 4px;
   border-top: 1px solid var(--border);
 }
 .rec-action {
@@ -542,12 +542,13 @@ body {
 
 /* ── Stock logo ── */
 .stock-logo-wrap {
-  width: 52px; height: 52px; border-radius: 12px;
+  width: 56px; height: 56px; border-radius: 14px;
   background: var(--surface-solid); border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden; flex-shrink: 0;
+  overflow: hidden; justify-self: center;
 }
-.stock-logo { width: 40px; height: 40px; object-fit: contain; }
+.stock-logo-wrap:empty { background: transparent; border-color: transparent; }
+.stock-logo { width: 44px; height: 44px; object-fit: contain; display: block; }
 
 /* ── Overall card restructure ── */
 .overall-top  { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
