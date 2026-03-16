@@ -90,7 +90,11 @@ export default function SearchBar({ onSearch, loading }: SearchBarProps) {
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={onKey}
-          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          onFocus={() => {
+            setQuery('')
+            setSuggestions([])
+            setOpen(false)
+          }}
           disabled={loading}
           autoComplete="off"
           spellCheck={false}
