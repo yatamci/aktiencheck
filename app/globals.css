@@ -249,7 +249,7 @@ body {
   .metrics-grid {
     grid-template-columns: 1fr 1fr;
     gap: 0 16px;
-    align-items: stretch; /* cols same height so spacer can flex */
+    align-items: start; /* columns fully independent – expanding left won't shift right */
   }
 }
 .grid-col       { display: flex; flex-direction: column; }
@@ -521,3 +521,21 @@ body {
 
 /* ── Price date ── */
 .price-date { font-size: 0.68rem; color: var(--text-3); margin-top: 3px; font-family: 'DM Mono', monospace; text-align: right; }
+
+/* ── Recommendation ── */
+.recommendation {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.rec-action {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 5px;
+}
+.rec-text {
+  font-size: 0.73rem;
+  color: var(--text-2);
+  line-height: 1.55;
+}
