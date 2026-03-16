@@ -74,6 +74,61 @@ function CompanyInfo({ data }: { data: StockData }) {
   )
 }
 
+
+// ── Buy / Hold / Sell recommendation ─────────────────────────────────────────
+function getRecommendation(metrics: MetricResult[], crossSignal?: string): {
+  action: 'Kaufen' | 'Halten' | 'Verkaufen'
+  color: string
+  text: string
+} {
+  const get = (key: string) => metrics.find(m => m.key === key)
+  const score = (key: string) => get(key)?.score ?? 'neutral'
+
+  const goodCount = metrics.filter(m => m.score === 'good').length
+  const badCount  = metrics.filter(m => m.score === 'bad').length
+  const relevant  = metrics.filter(m => m.score !== 'neutral').length
+  const pct       = relevant > 0 ? (goodCount * 2 + metrics.filter(m => m.score === 'warn').length) / (relevant * 2) : 0
+
+  // Trend signal from MA cross
+  const bullish = crossSignal === 'golden'
+  const bearish = crossSignal === 'death'
+
+  // RSI extremes
+  const rsi = get('rsi')?.value ?? null
+  const oversold  = rsi != null && rsi < 35
+  const overbought = rsi != null && rsi > 65
+
+  // Valuation
+  const cheap   = score('pe') === 'good' && score('ps') === 'good'
+  const pricey  = score('pe') === 'bad'  || score('ps') === 'bad'
+  const profitable = score('roe') === 'good' || score('netMargin') === 'good'
+  const growing  = score('revenueGrowth') === 'good' || score('earningsGrowth') === 'good'
+
+  if (pct >= 0.65 && (bullish || !bearish) && !overbought) {
+    const reasons = [
+      profitable && 'solide Profitabilität',
+      growing    && 'starkes Wachstum',
+      cheap      && 'günstige Bewertung',
+      bullish    && 'positiver Kurstrend (Golden Cross)',
+      oversold   && 'technisch überverkauft – mögliche Erholung',
+    ].filter(Boolean).slice(0, 2).join(' und ')
+    return { action: 'Kaufen', color: 'var(--good)',
+      text: `Die Fundamentaldaten sind stark${reasons ? ' – ' + reasons : ''}. Aus Sicht der Kennzahlen erscheint ein Einstieg attraktiv. Kein Anspruch auf Vollständigkeit – eigene Recherche empfohlen.` }
+  }
+  if (pct <= 0.3 || (bearish && badCount >= 3) || (overbought && pricey)) {
+    const reasons = [
+      pricey    && 'hohe Bewertung',
+      bearish   && 'negativer Kurstrend (Death Cross)',
+      overbought && 'technisch überkauft',
+      badCount >= 3 && `${badCount} schwache Kennzahlen`,
+    ].filter(Boolean).slice(0, 2).join(' und ')
+    return { action: 'Verkaufen', color: 'var(--bad)',
+      text: `Mehrere Warnsignale deuten auf erhöhtes Risiko hin${reasons ? ' – ' + reasons : ''}. Eine kritische Überprüfung der Position ist ratsam. Dies ist keine Anlageberatung.` }
+  }
+  return { action: 'Halten', color: 'var(--warn)',
+    text: `Das Gesamtbild ist gemischt. Stärken und Schwächen halten sich die Waage.${bullish ? ' Der Aufwärtstrend spricht für die Aktie.' : bearish ? ' Der Abwärtstrend sollte beobachtet werden.' : ''} Abwarten und die Entwicklung verfolgen.` }
+}
+
 export default function Home() {
   const [data,    setData]    = useState<StockData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -186,11 +241,12 @@ export default function Home() {
                       </span>
                     )}
                   </div>
-                  <div className="price-label">Aktueller Kurs</div>
-                  {data.priceDate && (
+                  {data.priceDate ? (
                     <div className="price-date">
                       Stand: {new Date(data.priceDate).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })}, {new Date(data.priceDate).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })} Uhr
                     </div>
+                  ) : (
+                    <div className="price-date">Aktueller Kurs</div>
                   )}
                 </div>
               )}
@@ -258,6 +314,17 @@ export default function Home() {
                         <div className="score-breakdown-row"><div className="breakdown-dot" style={{ background:'var(--warn)' }} />{warnCount} im Grenzbereich</div>
                         <div className="score-breakdown-row"><div className="breakdown-dot" style={{ background:'var(--bad)'  }} />{badCount} Kriterien schlecht</div>
                       </div>
+                      {(() => {
+                        const rec = getRecommendation(metrics, data?.crossSignal)
+                        return (
+                          <div className="recommendation">
+                            <div className="rec-action" style={{ color: rec.color }}>
+                              {rec.action === 'Kaufen' ? '↑' : rec.action === 'Verkaufen' ? '↓' : '→'} {rec.action}
+                            </div>
+                            <p className="rec-text">{rec.text}</p>
+                          </div>
+                        )
+                      })()}
                     </div>
                     <div className="overall-right">
                       <ScoreRing pct={overall.maxScore > 0 ? overall.score / overall.maxScore : 0} color={overall.color} />
