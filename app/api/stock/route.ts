@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { incrementUsage } from '../usage/route'
+import { incrementUsage } from '../../../lib/usageCounter'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface StockMetrics {
