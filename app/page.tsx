@@ -279,7 +279,7 @@ export default function Home() {
               ))}
             </div>
             <div className="grid-col">
-              {RIGHT_CATS.map((cat, idx) => (
+              {RIGHT_CATS.map((cat) => (
                 <CategorySection key={cat.title} title={cat.title}
                   metrics={cat.keys.map(k => metricsMap[k]).filter(Boolean)} />
               ))}
