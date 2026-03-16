@@ -80,13 +80,18 @@ export default function MetricCard({ metric }: { metric: MetricResult }) {
       <div className={`metric-expand${open ? ' metric-expand--open' : ''}`}>
         <div className="metric-expand-inner">
 
+          <div className="metric-detail-interp">
+            <span className="metric-detail-label">Einordnung</span>
+            <span className="metric-detail-value">{metric.interpretation}</span>
+          </div>
+
           <div className="metric-detail-formula">
-            <span className="metric-detail-label">📐 Berechnung</span>
+            <span className="metric-detail-label">Berechnung</span>
             <span className="metric-detail-value">{metric.formula}</span>
           </div>
 
           <div className="metric-detail-thresholds">
-            <span className="metric-detail-label">📊 Bewertung</span>
+            <span className="metric-detail-label">Bewertung</span>
             <div className="metric-threshold-rows">
               <div className="metric-threshold-row">
                 <span className="threshold-badge threshold-good">✓</span>
@@ -101,11 +106,6 @@ export default function MetricCard({ metric }: { metric: MetricResult }) {
                 <span>{metric.thresholds.bad}</span>
               </div>
             </div>
-          </div>
-
-          <div className="metric-detail-interp">
-            <span className="metric-detail-label">💡 Einordnung</span>
-            <span className="metric-detail-value">{metric.interpretation}</span>
           </div>
 
         </div>
