@@ -371,7 +371,7 @@ export async function GET(req:NextRequest) {
   const chartData=datesAsc.map((date,i)=>({date,close:closesAsc[i]??null,ma50:ma50arr[i]??null,ma200:ma200arr[i]??null}))
   const lastIdx=closesAsc.length-1
   const ma50L=lastIdx>=0?ma50arr[lastIdx]??null:null,ma200L=lastIdx>=0?ma200arr[lastIdx]??null:null
-  const crossSignal=ma50L&&ma200L?(ma50L>ma200L?'golden' as const:'death' as const):'none' as const
+  const crossSignal: 'golden'|'death'|'none' = ma50L&&ma200L ? (ma50L>ma200L ? 'golden' : 'death') : 'none'
 
   return NextResponse.json({
     name:result.name??ticker,symbol:ticker,sector:result.sector,industry:result.industry,
