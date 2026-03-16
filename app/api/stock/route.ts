@@ -182,7 +182,9 @@ async function fromFMP(ticker:string,key:string):Promise<Partial<StockMetrics>> 
 }
 
 async function fromAlphaVantage(ticker:string,key:string):Promise<Partial<StockMetrics>> {
-  const sym=ticker.replace('.DE','').replace('.PA','').replace('.HK','')
+  // AV only covers US/NYSE/NASDAQ stocks well; skip HK/DE/PA
+  if(ticker.includes('.HK')||ticker.includes('.KS')||ticker.includes('.T')) return {}
+  const sym=ticker.replace('.DE','').replace('.PA','').replace('.SW','').replace('.AS','')
   const d=first(await get(`https://www.alphavantage.co/query?function=OVERVIEW&symbol=${sym}&apikey=${key}`))
   if(!d||isLimited(d)||!str(d,'Symbol')) return {}
   return {
@@ -196,7 +198,12 @@ async function fromAlphaVantage(ticker:string,key:string):Promise<Partial<StockM
 }
 
 async function fromFinnhub(ticker:string,key:string):Promise<Partial<StockMetrics>> {
-  const sym=ticker.replace('.DE','').replace('.PA','')
+  // Finnhub HK stocks use format like "1810.HK" unchanged
+  // For European exchanges: remove .DE .PA etc for Finnhub which uses XETRA: prefix
+  const sym = ticker.includes('.HK') ? ticker :
+              ticker.includes('.DE') ? ticker.replace('.DE','') :
+              ticker.includes('.PA') ? ticker.replace('.PA','') :
+              ticker.replace('.SW','').replace('.AS','').replace('.MI','').replace('.MC','')
   const [pR,mR,qR]=await Promise.all([
     get(`https://finnhub.io/api/v1/stock/profile2?symbol=${sym}&token=${key}`),
     get(`https://finnhub.io/api/v1/stock/metric?symbol=${sym}&metric=all&token=${key}`),
