@@ -1,28 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
-  const symbol = (new URL(req.url).searchParams.get('symbol') ?? 'AAPL').trim()
-  const key    = process.env.FMP_API_KEY
-  if (!key) return NextResponse.json({ error: 'FMP_API_KEY not set' })
+// Simple in-memory counter (resets on each Vercel cold start)
+// For persistent tracking across requests, we use a module-level variable
+// Vercel functions share memory within the same instance
 
-  const results: Record<string, unknown> = { symbol, keyOk: true }
+let requestsToday = 0
+let lastResetDate = new Date().toDateString()
 
-  const tests: Record<string, string> = {
-    profile:     `https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${key}`,
-    ratios_ttm:  `https://financialmodelingprep.com/stable/ratios-ttm?symbol=${symbol}&apikey=${key}`,
-    metrics_ttm: `https://financialmodelingprep.com/stable/key-metrics-ttm?symbol=${symbol}&apikey=${key}`,
-    rsi:         `https://financialmodelingprep.com/stable/technical-indicator/daily?symbol=${symbol}&type=rsi&period=14&apikey=${key}`,
-    fx:          `https://financialmodelingprep.com/stable/fx-quotes?symbol=EURUSD&apikey=${key}`,
-  }
+export function incrementUsage() {
+  const today = new Date().toDateString()
+  if (today !== lastResetDate) { requestsToday = 0; lastResetDate = today }
+  requestsToday++
+}
 
-  for (const [name, url] of Object.entries(tests)) {
-    try {
-      const r = await fetch(url, { cache: 'no-store' })
-      const json = await r.json()
-      // Show all keys of first result so we know exact field names
-      const first = Array.isArray(json) ? json[0] : json
-      results[name] = { status: r.status, keys: first ? Object.keys(first) : [], sample: JSON.stringify(first).slice(0, 300) }
-    } catch (e) { results[name] = { error: String(e) } }
-  }
-  return NextResponse.json(results)
+export async function GET() {
+  const today = new Date().toDateString()
+  if (today !== lastResetDate) { requestsToday = 0; lastResetDate = today }
+  
+  return NextResponse.json({
+    today: requestsToday,
+    limits: {
+      fmp:          { used: requestsToday, total: 250,  label: 'Financial Modeling Prep' },
+      yahoo:        { used: requestsToday, total: 1000, label: 'Yahoo Finance (inoffiziell)' },
+      alphavantage: { used: Math.floor(requestsToday * 0.3), total: 25,   label: 'Alpha Vantage' },
+      finnhub:      { used: Math.floor(requestsToday * 0.3), total: 9999, label: 'Finnhub (60/min)' },
+    },
+    note: 'Zähler wird bei jedem Serverneustart zurückgesetzt. Nur als Orientierung.'
+  })
 }
