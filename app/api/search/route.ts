@@ -213,8 +213,6 @@ const DB: { symbol: string; name: string; exchange: string }[] = [
   { symbol:'ERIC',    name:'Ericsson (ADR)',               exchange:'NASDAQ' },
   { symbol:'NOK',     name:'Nokia Corporation',           exchange:'NYSE'   },
   { symbol:'TLSN',    name:'Tele2 AB',                    exchange:'STO'    },
-]
-
 
   // More US Tech
   { symbol:'AAPL',  name:'Apple Inc.',                    exchange:'NASDAQ' },
@@ -435,6 +433,7 @@ const DB: { symbol: string; name: string; exchange: string }[] = [
   { symbol:'EXC',   name:'Exelon Corporation',            exchange:'NASDAQ' },
   { symbol:'PCG',   name:'PG&E Corporation',              exchange:'NYSE'   },
   { symbol:'SRE',   name:'Sempra Energy',                 exchange:'NYSE'   },
+]
 
 // Deduplicate by symbol
 const TICKER_DB = Array.from(new Map(DB.map(r => [r.symbol, r])).values())
