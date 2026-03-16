@@ -356,17 +356,19 @@ export async function GET(req:NextRequest) {
   }
 
   // MA chart
-  const closesAsc=[...result.hist].reverse().map(h=>h.close)
-  const datesAsc= [...result.hist].reverse().map(h=>h.date)
+  // Always sort oldest→newest regardless of source (FMP=newest-first, Yahoo=oldest-first)
+  const histOldestFirst = [...result.hist].sort((a,b) => a.date.localeCompare(b.date))
+  const closesAsc = histOldestFirst.map(h=>h.close)
+  const datesAsc  = histOldestFirst.map(h=>h.date)
   const ma50arr=sma(closesAsc,50),ma200arr=sma(closesAsc,200)
   const chartData=datesAsc.map((date,i)=>({date,close:closesAsc[i]??null,ma50:ma50arr[i]??null,ma200:ma200arr[i]??null}))
-  const last=closesAsc.length-1
-  const ma50L=last>=0?ma50arr[last]??null:null,ma200L=last>=0?ma200arr[last]??null:null
-  const crossSignal=ma50L&&ma200L?(ma50L>ma200L?'golden':'death'):'none'
+  const lastIdx=closesAsc.length-1
+  const ma50L=lastIdx>=0?ma50arr[lastIdx]??null:null,ma200L=lastIdx>=0?ma200arr[lastIdx]??null:null
+  const crossSignal=ma50L&&ma200L?(ma50L>ma200L?'golden' as const:'death' as const):'none' as const
 
   return NextResponse.json({
     name:result.name??ticker,symbol:ticker,sector:result.sector,industry:result.industry,
-    priceDate: result.hist.length > 0 ? result.hist[0].date + 'T16:00:00' : new Date().toISOString(),
+    priceDate: result.hist.length > 0 ? [...result.hist].sort((a,b)=>b.date.localeCompare(a.date))[0].date + 'T16:00:00' : new Date().toISOString(),
     price:result.price,priceEur,currency,description:shortDesc,
     founded:result.ipoDate?.slice(0,4)??null,
     hq:[result.city,result.country].filter(Boolean).join(', ')||null,
