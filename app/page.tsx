@@ -1,16 +1,12 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import ThemeToggle from '../components/ThemeToggle'
 import MetricCard  from '../components/MetricCard'
 import SearchBar   from '../components/SearchBar'
 import MAChart     from '../components/MAChart'
 import { StockData, buildMetrics, calculateOverallScore, MetricResult } from '../lib/evaluate'
 
-// ── Category definitions ────────────────────────────────────────────────────
-// Left:  Bewertung (3) + Rentabilität (5) = 8 rows
-// Right: Liquidität (3) + Dividende (3) + [spacer] + Technische (1) = 8 rows
-// Spacer pushes RSI down so its bottom aligns with Nettomarge bottom
 const LEFT_CATS = [
   { title: 'Bewertung',    keys: ['pe','ps','pb'] },
   { title: 'Rentabilität', keys: ['roe','roa','grossMargin','operatingMargin','netMargin'] },
@@ -21,6 +17,7 @@ const RIGHT_CATS = [
   { title: 'Technische Analyse',        keys: ['rsi'] },
 ]
 
+// ── Score Ring ────────────────────────────────────────────────────────────────
 function ScoreRing({ pct, color }: { pct: number; color: string }) {
   const r = 52, circ = 2 * Math.PI * r
   const offset = circ * (1 - Math.min(1, Math.max(0, pct)))
@@ -41,6 +38,7 @@ function ScoreRing({ pct, color }: { pct: number; color: string }) {
   )
 }
 
+// ── Category Section ──────────────────────────────────────────────────────────
 function CategorySection({ title, metrics }: { title: string; metrics: MetricResult[] }) {
   if (metrics.length === 0) return null
   return (
@@ -53,6 +51,7 @@ function CategorySection({ title, metrics }: { title: string; metrics: MetricRes
   )
 }
 
+// ── Company Info ──────────────────────────────────────────────────────────────
 function CompanyInfo({ data }: { data: StockData }) {
   const facts = [
     data.sector    && `${data.sector}${data.industry ? ` · ${data.industry}` : ''}`,
@@ -74,61 +73,73 @@ function CompanyInfo({ data }: { data: StockData }) {
   )
 }
 
-
-// ── Buy / Hold / Sell recommendation ─────────────────────────────────────────
+// ── Buy/Hold/Sell Recommendation ──────────────────────────────────────────────
 function getRecommendation(metrics: MetricResult[], crossSignal?: string): {
-  action: 'Kaufen' | 'Halten' | 'Verkaufen'
-  color: string
-  text: string
+  action: 'Kaufen' | 'Halten' | 'Verkaufen'; color: string; text: string
 } {
-  const get = (key: string) => metrics.find(m => m.key === key)
-  const score = (key: string) => get(key)?.score ?? 'neutral'
-
+  const score = (key: string) => metrics.find(m => m.key === key)?.score ?? 'neutral'
+  const val   = (key: string) => metrics.find(m => m.key === key)?.value ?? null
   const goodCount = metrics.filter(m => m.score === 'good').length
   const badCount  = metrics.filter(m => m.score === 'bad').length
   const relevant  = metrics.filter(m => m.score !== 'neutral').length
   const pct       = relevant > 0 ? (goodCount * 2 + metrics.filter(m => m.score === 'warn').length) / (relevant * 2) : 0
-
-  // Trend signal from MA cross
-  const bullish = crossSignal === 'golden'
-  const bearish = crossSignal === 'death'
-
-  // RSI extremes
-  const rsi = get('rsi')?.value ?? null
+  const bullish   = crossSignal === 'golden'
+  const bearish   = crossSignal === 'death'
+  const rsi       = val('rsi') as number | null
   const oversold  = rsi != null && rsi < 35
-  const overbought = rsi != null && rsi > 65
-
-  // Valuation
-  const cheap   = score('pe') === 'good' && score('ps') === 'good'
-  const pricey  = score('pe') === 'bad'  || score('ps') === 'bad'
-  const profitable = score('roe') === 'good' || score('netMargin') === 'good'
-  const growing  = score('revenueGrowth') === 'good' || score('earningsGrowth') === 'good'
+  const overbought= rsi != null && rsi > 65
+  const cheap     = score('pe') === 'good' && score('ps') === 'good'
+  const pricey    = score('pe') === 'bad'  || score('ps') === 'bad'
+  const profitable= score('roe') === 'good' || score('netMargin') === 'good'
+  const growing   = score('revenueGrowth') === 'good' || score('earningsGrowth') === 'good'
 
   if (pct >= 0.65 && (bullish || !bearish) && !overbought) {
-    const reasons = [
-      profitable && 'solide Profitabilität',
-      growing    && 'starkes Wachstum',
-      cheap      && 'günstige Bewertung',
-      bullish    && 'positiver Kurstrend (Golden Cross)',
-      oversold   && 'technisch überverkauft – mögliche Erholung',
-    ].filter(Boolean).slice(0, 2).join(' und ')
-    return { action: 'Kaufen', color: 'var(--good)',
-      text: `Die Fundamentaldaten sind stark${reasons ? ' – ' + reasons : ''}. Aus Sicht der Kennzahlen erscheint ein Einstieg attraktiv. Kein Anspruch auf Vollständigkeit – eigene Recherche empfohlen.` }
+    const reasons = [profitable && 'solide Profitabilität', growing && 'starkes Wachstum', cheap && 'günstige Bewertung', bullish && 'positiver Kurstrend', oversold && 'überverkauft'].filter(Boolean).slice(0,2).join(' und ')
+    return { action:'Kaufen', color:'var(--good)', text:`Starke Fundamentaldaten${reasons?' – '+reasons:''}. Aus Kennzahlenperspektive erscheint ein Einstieg attraktiv. Keine Anlageberatung – eigene Recherche empfohlen.` }
   }
   if (pct <= 0.3 || (bearish && badCount >= 3) || (overbought && pricey)) {
-    const reasons = [
-      pricey    && 'hohe Bewertung',
-      bearish   && 'negativer Kurstrend (Death Cross)',
-      overbought && 'technisch überkauft',
-      badCount >= 3 && `${badCount} schwache Kennzahlen`,
-    ].filter(Boolean).slice(0, 2).join(' und ')
-    return { action: 'Verkaufen', color: 'var(--bad)',
-      text: `Mehrere Warnsignale deuten auf erhöhtes Risiko hin${reasons ? ' – ' + reasons : ''}. Eine kritische Überprüfung der Position ist ratsam. Dies ist keine Anlageberatung.` }
+    const reasons = [pricey && 'hohe Bewertung', bearish && 'negativer Kurstrend', overbought && 'technisch überkauft', badCount >= 3 && `${badCount} schwache Kennzahlen`].filter(Boolean).slice(0,2).join(' und ')
+    return { action:'Verkaufen', color:'var(--bad)', text:`Mehrere Warnsignale${reasons?' ('+reasons+')':''}. Eine Überprüfung der Position ist ratsam. Dies ist keine Anlageberatung.` }
   }
-  return { action: 'Halten', color: 'var(--warn)',
-    text: `Das Gesamtbild ist gemischt. Stärken und Schwächen halten sich die Waage.${bullish ? ' Der Aufwärtstrend spricht für die Aktie.' : bearish ? ' Der Abwärtstrend sollte beobachtet werden.' : ''} Abwarten und die Entwicklung verfolgen.` }
+  return { action:'Halten', color:'var(--warn)', text:`Gemischtes Bild – Stärken und Schwächen halten sich die Waage.${bullish?' Aufwärtstrend positiv.':bearish?' Abwärtstrend beobachten.':''} Abwarten und Entwicklung verfolgen.` }
 }
 
+// ── Usage Bar ─────────────────────────────────────────────────────────────────
+interface UsageData {
+  today: number
+  limits: Record<string, { used: number; total: number; label: string }>
+}
+
+function UsageBar() {
+  const [usage, setUsage] = useState<UsageData | null>(null)
+  useEffect(() => {
+    fetch('/api/usage').then(r => r.json()).then(setUsage).catch(() => {})
+  }, [])
+  if (!usage) return null
+
+  const fmp = usage.limits.fmp
+  const pct = Math.min(100, Math.round((fmp.used / fmp.total) * 100))
+
+  return (
+    <div className="usage-bar glass-card">
+      <div className="usage-title">API-Kontingent heute</div>
+      <div className="usage-items">
+        {Object.values(usage.limits).map((l) => (
+          <div key={l.label} className="usage-item">
+            <span className="usage-label">{l.label}</span>
+            <div className="usage-track">
+              <div className="usage-fill" style={{ width: `${Math.min(100, (l.used / (l.total === 9999 ? 100 : l.total)) * 100)}%` }} />
+            </div>
+            <span className="usage-count">{l.used} / {l.total === 9999 ? '∞' : l.total}</span>
+          </div>
+        ))}
+      </div>
+      <div className="usage-note">{usage.note}</div>
+    </div>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function Home() {
   const [data,    setData]    = useState<StockData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -140,18 +151,11 @@ export default function Home() {
     try {
       const res  = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`)
       const json: StockData & { rateLimited?: boolean } = await res.json()
-      if (json.rateLimited) {
-        setRateLimited(true)
-      } else if (json.error) {
-        setError(json.error)
-      } else {
-        setData(json)
-      }
-    } catch {
-      setError('Netzwerkfehler. Bitte Verbindung prüfen.')
-    } finally {
-      setLoading(false)
-    }
+      if (json.rateLimited) setRateLimited(true)
+      else if (json.error)  setError(json.error)
+      else                  setData(json)
+    } catch { setError('Netzwerkfehler.') }
+    finally   { setLoading(false) }
   }, [])
 
   const metrics    = data ? buildMetrics(data) : []
@@ -175,27 +179,21 @@ export default function Home() {
 
       {loading && (
         <div className="loading-wrapper fade-in">
-          <div className="spinner" />
-          <p className="loading-text">Finanzdaten werden geladen …</p>
+          <div className="spinner" /><p className="loading-text">Finanzdaten werden geladen …</p>
         </div>
       )}
-
       {rateLimited && !loading && (
         <div className="glass-card error-card fade-in">
           <p className="error-title">⏳ Tageslimit erreicht</p>
-          <p className="error-msg">Das tägliche Abfragelimit der Datenquelle ist ausgeschöpft. Heute sind keine weiteren Abfragen möglich.</p>
-          <p className="error-hint">Bitte versuche es morgen wieder. Das Limit wird täglich um Mitternacht (UTC) zurückgesetzt.</p>
+          <p className="error-msg">Das tägliche Abfragelimit ist ausgeschöpft. Bitte morgen erneut versuchen.</p>
         </div>
       )}
-
       {error && !loading && !rateLimited && (
         <div className="glass-card error-card fade-in">
-          <p className="error-title">❌ Fehler beim Laden</p>
+          <p className="error-title">❌ Fehler</p>
           <p className="error-msg">{error}</p>
-          <p className="error-hint">Prüfe ob <strong>FMP_API_KEY</strong> in Vercel → Settings → Environment Variables gesetzt ist, dann neu deployen.</p>
         </div>
       )}
-
       {!data && !loading && !error && !rateLimited && (
         <div className="empty-state fade-in">
           <div className="empty-icon">🔍</div>
@@ -217,37 +215,47 @@ export default function Home() {
                   {data.sector && <span className="stock-sector">{data.sector}</span>}
                 </div>
               </div>
+
+              {/* Logo in center */}
+              {data.symbol && (
+                <div className="stock-logo-wrap">
+                  <img
+                    src={`https://logo.clearbit.com/${data.symbol.replace('.DE','').replace('.HK','').replace('.PA','').toLowerCase()}.com`}
+                    alt=""
+                    className="stock-logo"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                </div>
+              )}
+
               {data.price != null && (
                 <div className="stock-price">
                   <div className="price-value">
-                    {/* Only show EUR if we have a real converted value AND it differs from original */}
                     {data.priceEur != null && data.currency !== 'EUR' && (
                       <>
                         <span className="price-orig">
-                          {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          {' '}{data.currency}
+                          {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}
+                          {'\u00a0'}{data.currency}
                         </span>
-                        <span className="price-sep">{' | '}</span>
+                        <span className="price-sep">{'\u00a0|\u00a0'}</span>
                         <span className="price-eur">
-                          {Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          {' €'}
+                          {Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}
+                          {'\u00a0€'}
                         </span>
                       </>
                     )}
                     {(data.currency === 'EUR' || data.priceEur == null) && (
                       <span className="price-eur">
-                        {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        {' '}{data.currency ?? ''}
+                        {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}
+                        {'\u00a0'}{data.currency ?? ''}
                       </span>
                     )}
                   </div>
                   {data.priceDate ? (
                     <div className="price-date">
-                      Stand: {new Date(data.priceDate).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })}, {new Date(data.priceDate).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })} Uhr
+                      Stand: {new Date(data.priceDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}, {new Date(data.priceDate).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr
                     </div>
-                  ) : (
-                    <div className="price-date">Aktueller Kurs</div>
-                  )}
+                  ) : <div className="price-date">Aktueller Kurs</div>}
                 </div>
               )}
             </div>
@@ -256,35 +264,26 @@ export default function Home() {
 
           {/* Legend */}
           <div className="legend">
-            <div className="legend-item"><div className="legend-dot" style={{ background:'var(--good)' }} />Gut</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background:'var(--warn)' }} />Aufpassen</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background:'var(--bad)'  }} />Schlecht</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background:'var(--neutral)' }} />Keine Daten</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--good)'}}/>Gut</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--warn)'}}/>Aufpassen</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--bad)'}} />Schlecht</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--neutral)'}}/>Keine Daten</div>
           </div>
 
-          {/* ── Metrics: explicit 2-col grid with spacer for RSI alignment ── */}
+          {/* ── Metrics grid ── */}
           <div className="metrics-grid">
-
-            {/* LEFT */}
-            <div className="grid-col" id="grid-left">
+            <div className="grid-col">
               {LEFT_CATS.map(cat => (
                 <CategorySection key={cat.title} title={cat.title}
                   metrics={cat.keys.map(k => metricsMap[k]).filter(Boolean)} />
               ))}
             </div>
-
-            {/* RIGHT: Liquidität + Dividende + auto-spacer + Technische */}
-            <div className="grid-col" id="grid-right">
-              <CategorySection title="Liquidität & Verschuldung"
-                metrics={RIGHT_CATS[0].keys.map(k => metricsMap[k]).filter(Boolean)} />
-              <CategorySection title="Dividende & Wachstum"
-                metrics={RIGHT_CATS[1].keys.map(k => metricsMap[k]).filter(Boolean)} />
-              {/* Spacer grows to push RSI down until its bottom aligns with Nettomarge */}
-              <div className="rsi-spacer" />
-              <CategorySection title="Technische Analyse"
-                metrics={RIGHT_CATS[2].keys.map(k => metricsMap[k]).filter(Boolean)} />
+            <div className="grid-col">
+              {RIGHT_CATS.map((cat, idx) => (
+                <CategorySection key={cat.title} title={cat.title}
+                  metrics={cat.keys.map(k => metricsMap[k]).filter(Boolean)} />
+              ))}
             </div>
-
           </div>
 
           {/* ── Bottom: Chart + Score ── */}
@@ -292,44 +291,42 @@ export default function Home() {
             {data.chartData && data.chartData.length > 0 && (
               <div>
                 <p className="section-title">Trendanalyse</p>
-                <MAChart
-                  data={data.chartData}
-                  crossSignal={data.crossSignal ?? 'none'}
-                  ma50Latest={data.ma50Latest   ?? null}
-                  ma200Latest={data.ma200Latest ?? null}
-                  currency={data.currency       ?? 'USD'}
-                />
+                <MAChart data={data.chartData} crossSignal={data.crossSignal??'none'}
+                  ma50Latest={data.ma50Latest??null} ma200Latest={data.ma200Latest??null}
+                  currency={data.currency??'USD'} />
               </div>
             )}
             {overall && (
               <div>
                 <p className="section-title">Gesamtbewertung</p>
                 <div className="glass-card overall-card">
-                  <div className="overall-inner">
+                  {/* Top: label + ring side by side */}
+                  <div className="overall-top">
                     <div className="overall-left">
                       <h3>Aktiencheck-Score</h3>
-                      <div className="overall-label" style={{ color: overall.color }}>{overall.label}</div>
+                      <div className="overall-label" style={{color:overall.color}}>{overall.label}</div>
                       <div className="score-breakdown">
-                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{ background:'var(--good)' }} />{goodCount} Kriterien gut</div>
-                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{ background:'var(--warn)' }} />{warnCount} im Grenzbereich</div>
-                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{ background:'var(--bad)'  }} />{badCount} Kriterien schlecht</div>
+                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--good)'}}/>{goodCount} Kriterien gut</div>
+                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--warn)'}}/>{warnCount} im Grenzbereich</div>
+                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--bad)'}} />{badCount} Kriterien schlecht</div>
                       </div>
-                      {(() => {
-                        const rec = getRecommendation(metrics, data?.crossSignal)
-                        return (
-                          <div className="recommendation">
-                            <div className="rec-action" style={{ color: rec.color }}>
-                              {rec.action === 'Kaufen' ? '↑' : rec.action === 'Verkaufen' ? '↓' : '→'} {rec.action}
-                            </div>
-                            <p className="rec-text">{rec.text}</p>
-                          </div>
-                        )
-                      })()}
                     </div>
                     <div className="overall-right">
-                      <ScoreRing pct={overall.maxScore > 0 ? overall.score / overall.maxScore : 0} color={overall.color} />
+                      <ScoreRing pct={overall.maxScore > 0 ? overall.score/overall.maxScore : 0} color={overall.color} />
                     </div>
                   </div>
+                  {/* Bottom: recommendation */}
+                  {(() => {
+                    const rec = getRecommendation(metrics, data?.crossSignal)
+                    return (
+                      <div className="recommendation">
+                        <div className="rec-action" style={{color:rec.color}}>
+                          {rec.action==='Kaufen'?'↑':rec.action==='Verkaufen'?'↓':'→'} {rec.action}
+                        </div>
+                        <p className="rec-text">{rec.text}</p>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             )}
@@ -344,8 +341,10 @@ export default function Home() {
         machen – alle Angaben ohne Gewähr. <strong>Dies ist keine Anlageberatung.</strong> Jede
         Investitionsentscheidung liegt in der alleinigen Verantwortung des Nutzers. Vergangene
         Wertentwicklungen sind kein Indikator für zukünftige Ergebnisse. Bitte konsultiere einen
-        zugelassenen Finanzberater. Datenquelle: Financial Modeling Prep.
+        zugelassenen Finanzberater. Datenquelle: Financial Modeling Prep, Yahoo Finance, Alpha Vantage, Finnhub.
       </footer>
+
+      <UsageBar />
     </main>
   )
 }
