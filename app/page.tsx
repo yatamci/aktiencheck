@@ -110,11 +110,11 @@ interface UsageData {
   limits: Record<string, { used: number; total: number; label: string }>
 }
 
-function UsageBar() {
+function UsageBar({ refreshKey }: { refreshKey: number }) {
   const [usage, setUsage] = useState<UsageData | null>(null)
   useEffect(() => {
     fetch('/api/usage').then(r => r.json()).then(setUsage).catch(() => {})
-  }, [])
+  }, [refreshKey])
   if (!usage) return null
 
   const fmp = usage.limits.fmp
@@ -139,12 +139,73 @@ function UsageBar() {
   )
 }
 
+
+// ── Stock Logo ────────────────────────────────────────────────────────────────
+// Maps ticker → known domain for logo lookup
+const TICKER_DOMAINS: Record<string,string> = {
+  AAPL:'apple.com', MSFT:'microsoft.com', GOOGL:'google.com', GOOG:'google.com',
+  AMZN:'amazon.com', TSLA:'tesla.com', META:'meta.com', NVDA:'nvidia.com',
+  NFLX:'netflix.com', INTC:'intel.com', AMD:'amd.com', ORCL:'oracle.com',
+  CRM:'salesforce.com', ADBE:'adobe.com', PYPL:'paypal.com', UBER:'uber.com',
+  ABNB:'airbnb.com', SPOT:'spotify.com', COIN:'coinbase.com', SHOP:'shopify.com',
+  JPM:'jpmorganchase.com', BAC:'bankofamerica.com', GS:'goldmansachs.com',
+  V:'visa.com', MA:'mastercard.com', WMT:'walmart.com', MCD:'mcdonalds.com',
+  SBUX:'starbucks.com', NKE:'nike.com', DIS:'disney.com', KO:'coca-cola.com',
+  PEP:'pepsico.com', JNJ:'jnj.com', PFE:'pfizer.com', MRNA:'modernatx.com',
+  XOM:'exxonmobil.com', CVX:'chevron.com', BA:'boeing.com', CAT:'caterpillar.com',
+  SAP:'sap.com', 'SIE.DE':'siemens.com', 'ALV.DE':'allianz.com',
+  'BMW.DE':'bmw.com', 'MBG.DE':'mercedes-benz.com', 'ADS.DE':'adidas.com',
+  'BAYN.DE':'bayer.com', 'DTE.DE':'telekom.com', 'LHA.DE':'lufthansa.com',
+  'MC.PA':'lvmh.com', 'OR.PA':'loreal.com', 'AIR.PA':'airbus.com',
+  BABA:'alibaba.com', BIDU:'baidu.com', NIO:'nio.com', ASML:'asml.com',
+  RACE:'ferrari.com', TSM:'tsmc.com', TM:'toyota.com', SONY:'sony.com',
+}
+
+function StockLogo({ symbol, name }: { symbol?: string; name?: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(0)
+
+  useEffect(() => {
+    if (!symbol) return
+    const domain = TICKER_DOMAINS[symbol.toUpperCase()]
+    if (domain) {
+      setSrc(`https://logo.clearbit.com/${domain}`)
+    } else {
+      // Guess domain from company name
+      const clean = (name ?? symbol)
+        .toLowerCase()
+        .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i, '')
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 20)
+      setSrc(`https://logo.clearbit.com/${clean}.com`)
+    }
+    setFailed(0)
+  }, [symbol, name])
+
+  const fallbacks = [
+    src,
+    symbol ? `https://logo.clearbit.com/${symbol.replace(/\..+/,'').toLowerCase()}.com` : null,
+  ].filter(Boolean) as string[]
+
+  if (!src || failed >= fallbacks.length) return null
+
+  return (
+    <img
+      src={fallbacks[Math.min(failed, fallbacks.length - 1)]}
+      alt=""
+      className="stock-logo"
+      onError={() => setFailed(f => f + 1)}
+    />
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Home() {
   const [data,    setData]    = useState<StockData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [rateLimited, setRateLimited] = useState(false)
+  const [usageKey, setUsageKey] = useState(0)
 
   const search = useCallback(async (symbol: string) => {
     setLoading(true); setError(null); setData(null); setRateLimited(false)
@@ -155,7 +216,7 @@ export default function Home() {
       else if (json.error)  setError(json.error)
       else                  setData(json)
     } catch { setError('Netzwerkfehler.') }
-    finally   { setLoading(false) }
+    finally   { setLoading(false); setUsageKey(k => k + 1) }
   }, [])
 
   const metrics    = data ? buildMetrics(data) : []
@@ -216,15 +277,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Logo in center */}
+              {/* Logo in center – tries multiple sources */}
               {data.symbol && (
                 <div className="stock-logo-wrap">
-                  <img
-                    src={`https://logo.clearbit.com/${data.symbol.replace('.DE','').replace('.HK','').replace('.PA','').toLowerCase()}.com`}
-                    alt=""
-                    className="stock-logo"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
+                  <StockLogo symbol={data.symbol} name={data.name} />
                 </div>
               )}
 
@@ -344,7 +400,7 @@ export default function Home() {
         zugelassenen Finanzberater. Datenquelle: Financial Modeling Prep, Yahoo Finance, Alpha Vantage, Finnhub.
       </footer>
 
-      <UsageBar />
+      <UsageBar refreshKey={usageKey} />
     </main>
   )
 }
