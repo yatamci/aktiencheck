@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { incrementUsage } from '../usage/route'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface StockMetrics {
@@ -297,6 +298,7 @@ export async function GET(req:NextRequest) {
   const avKey=  process.env.ALPHA_VANTAGE_KEY??''
   const tdKey=  process.env.TWELVE_DATA_KEY??''
 
+  incrementUsage()
   if(!query)  return NextResponse.json({error:'Kein Symbol angegeben.'},{status:400})
   if(!fmpKey) return NextResponse.json({error:'FMP_API_KEY nicht gesetzt.'},{status:500})
 
