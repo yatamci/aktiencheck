@@ -104,97 +104,69 @@ function getRecommendation(metrics: MetricResult[], crossSignal?: string): {
   return { action:'Halten', color:'var(--warn)', text:`Gemischtes Bild – Stärken und Schwächen halten sich die Waage.${bullish?' Aufwärtstrend positiv.':bearish?' Abwärtstrend beobachten.':''} Abwarten und Entwicklung verfolgen.` }
 }
 
-// ── Usage Bar ─────────────────────────────────────────────────────────────────
-interface UsageData {
-  today: number
-  limits: Record<string, { used: number; total: number; label: string }>
-}
-
-function UsageBar({ refreshKey }: { refreshKey: number }) {
-  const [usage, setUsage] = useState<UsageData | null>(null)
-  useEffect(() => {
-    fetch('/api/usage').then(r => r.json()).then(setUsage).catch(() => {})
-  }, [refreshKey])
-  if (!usage) return null
-
-  const fmp = usage.limits.fmp
-  const pct = Math.min(100, Math.round((fmp.used / fmp.total) * 100))
-
-  return (
-    <div className="usage-bar glass-card">
-      <div className="usage-title">API-Kontingent heute</div>
-      <div className="usage-items">
-        {Object.values(usage.limits).map((l) => (
-          <div key={l.label} className="usage-item">
-            <span className="usage-label">{l.label}</span>
-            <div className="usage-track">
-              <div className="usage-fill" style={{ width: `${Math.min(100, (l.used / (l.total === 9999 ? 100 : l.total)) * 100)}%` }} />
-            </div>
-            <span className="usage-count">{l.used} / {l.total === 9999 ? '∞' : l.total}</span>
-          </div>
-        ))}
-      </div>
-      <div className="usage-note">{usage.note}</div>
-    </div>
-  )
-}
-
-
 // ── Stock Logo ────────────────────────────────────────────────────────────────
-// Maps ticker → known domain for logo lookup
+// logo.dev: free, reliable, 100k logos, works by domain name
 const TICKER_DOMAINS: Record<string,string> = {
   AAPL:'apple.com', MSFT:'microsoft.com', GOOGL:'google.com', GOOG:'google.com',
   AMZN:'amazon.com', TSLA:'tesla.com', META:'meta.com', NVDA:'nvidia.com',
   NFLX:'netflix.com', INTC:'intel.com', AMD:'amd.com', ORCL:'oracle.com',
   CRM:'salesforce.com', ADBE:'adobe.com', PYPL:'paypal.com', UBER:'uber.com',
   ABNB:'airbnb.com', SPOT:'spotify.com', COIN:'coinbase.com', SHOP:'shopify.com',
-  JPM:'jpmorganchase.com', BAC:'bankofamerica.com', GS:'goldmansachs.com',
-  V:'visa.com', MA:'mastercard.com', WMT:'walmart.com', MCD:'mcdonalds.com',
-  SBUX:'starbucks.com', NKE:'nike.com', DIS:'disney.com', KO:'coca-cola.com',
-  PEP:'pepsico.com', JNJ:'jnj.com', PFE:'pfizer.com', MRNA:'modernatx.com',
-  XOM:'exxonmobil.com', CVX:'chevron.com', BA:'boeing.com', CAT:'caterpillar.com',
-  SAP:'sap.com', 'SIE.DE':'siemens.com', 'ALV.DE':'allianz.com',
-  'BMW.DE':'bmw.com', 'MBG.DE':'mercedes-benz.com', 'ADS.DE':'adidas.com',
-  'BAYN.DE':'bayer.com', 'DTE.DE':'telekom.com', 'LHA.DE':'lufthansa.com',
-  'MC.PA':'lvmh.com', 'OR.PA':'loreal.com', 'AIR.PA':'airbus.com',
-  BABA:'alibaba.com', BIDU:'baidu.com', NIO:'nio.com', ASML:'asml.com',
-  RACE:'ferrari.com', TSM:'tsmc.com', TM:'toyota.com', SONY:'sony.com',
+  SNAP:'snap.com', PINS:'pinterest.com', RBLX:'roblox.com', PLTR:'palantir.com',
+  NET:'cloudflare.com', DDOG:'datadoghq.com', CRWD:'crowdstrike.com',
+  OKTA:'okta.com', ZS:'zscaler.com', NOW:'servicenow.com', HUBS:'hubspot.com',
+  TEAM:'atlassian.com', TWLO:'twilio.com', MDB:'mongodb.com', SNOW:'snowflake.com',
+  JPM:'jpmorganchase.com', BAC:'bankofamerica.com', WFC:'wellsfargo.com',
+  GS:'goldmansachs.com', MS:'morganstanley.com', C:'citi.com', BLK:'blackrock.com',
+  V:'visa.com', MA:'mastercard.com', AXP:'americanexpress.com',
+  WMT:'walmart.com', TGT:'target.com', COST:'costco.com', HD:'homedepot.com',
+  MCD:'mcdonalds.com', SBUX:'starbucks.com', NKE:'nike.com', DIS:'disney.com',
+  CMCSA:'comcast.com', PG:'pg.com', KO:'coca-cola.com', PEP:'pepsico.com',
+  JNJ:'jnj.com', PFE:'pfizer.com', MRK:'merck.com', ABBV:'abbvie.com',
+  LLY:'lilly.com', AMGN:'amgen.com', GILD:'gilead.com', MRNA:'modernatx.com',
+  UNH:'unitedhealthgroup.com', CVS:'cvshealth.com',
+  XOM:'exxonmobil.com', CVX:'chevron.com', BA:'boeing.com',
+  CAT:'caterpillar.com', HON:'honeywell.com', UPS:'ups.com', FDX:'fedex.com',
+  SAP:'sap.com', ASML:'asml.com', TSM:'tsmc.com', TM:'toyota.com',
+  SONY:'sony.com', BABA:'alibaba.com', BIDU:'baidu.com', NIO:'nio.com',
+  RACE:'ferrari.com', NOK:'nokia.com', ERIC:'ericsson.com',
+  T:'att.com', VZ:'verizon.com', TMUS:'t-mobile.com',
+  EBAY:'ebay.com', ETSY:'etsy.com', W:'wayfair.com',
+  SBUX:'starbucks.com', CMG:'chipotle.com', YUM:'yum.com',
+  DAL:'delta.com', UAL:'united.com', AAL:'aa.com', MAR:'marriott.com',
+  HLT:'hilton.com', BKNG:'booking.com', EXPE:'expedia.com',
 }
 
 function StockLogo({ symbol, name }: { symbol?: string; name?: string }) {
-  const [src, setSrc] = useState<string | null>(null)
-  const [failed, setFailed] = useState(0)
+  const [imgSrc, setImgSrc] = useState<string | null>(null)
+  const [errCount, setErrCount] = useState(0)
 
   useEffect(() => {
     if (!symbol) return
+    setErrCount(0)
     const domain = TICKER_DOMAINS[symbol.toUpperCase()]
     if (domain) {
-      setSrc(`https://logo.clearbit.com/${domain}`)
+      setImgSrc(`https://img.logo.dev/${domain}?token=pk_TCDtCNyHT5KWRmFOWcuaVw&size=80`)
     } else {
-      // Guess domain from company name
-      const clean = (name ?? symbol)
+      // Derive domain from company name or symbol
+      const base = (name ?? symbol)
         .toLowerCase()
         .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i, '')
+        .trim()
         .replace(/[^a-z0-9]/g, '')
         .slice(0, 20)
-      setSrc(`https://logo.clearbit.com/${clean}.com`)
+      setImgSrc(`https://img.logo.dev/${base}.com?token=pk_TCDtCNyHT5KWRmFOWcuaVw&size=80`)
     }
-    setFailed(0)
   }, [symbol, name])
 
-  const fallbacks = [
-    src,
-    symbol ? `https://logo.clearbit.com/${symbol.replace(/\..+/,'').toLowerCase()}.com` : null,
-  ].filter(Boolean) as string[]
-
-  if (!src || failed >= fallbacks.length) return null
+  if (!imgSrc || errCount > 0) return null
 
   return (
     <img
-      src={fallbacks[Math.min(failed, fallbacks.length - 1)]}
+      src={imgSrc}
       alt=""
       className="stock-logo"
-      onError={() => setFailed(f => f + 1)}
+      onError={() => setErrCount(n => n + 1)}
     />
   )
 }
@@ -205,7 +177,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [rateLimited, setRateLimited] = useState(false)
-  const [usageKey, setUsageKey] = useState(0)
 
   const search = useCallback(async (symbol: string) => {
     setLoading(true); setError(null); setData(null); setRateLimited(false)
@@ -216,7 +187,7 @@ export default function Home() {
       else if (json.error)  setError(json.error)
       else                  setData(json)
     } catch { setError('Netzwerkfehler.') }
-    finally   { setLoading(false); setUsageKey(k => k + 1) }
+    finally   { setLoading(false) }
   }, [])
 
   const metrics    = data ? buildMetrics(data) : []
@@ -287,23 +258,15 @@ export default function Home() {
               {data.price != null && (
                 <div className="stock-price">
                   <div className="price-value">
-                    {data.priceEur != null && data.currency !== 'EUR' && (
-                      <>
-                        <span className="price-orig">
-                          {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}
-                          {'\u00a0'}{data.currency}
-                        </span>
-                        <span className="price-sep">{'\u00a0|\u00a0'}</span>
-                        <span className="price-eur">
-                          {Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}
-                          {'\u00a0€'}
-                        </span>
-                      </>
-                    )}
-                    {(data.currency === 'EUR' || data.priceEur == null) && (
+                    {data.priceEur != null && data.currency !== 'EUR' ? (
+                      <span className="price-both">
+                        <span className="price-orig">{Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}</span>
+                        <span className="price-sep">{' | '}</span>
+                        <span className="price-eur">{Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' €'}</span>
+                      </span>
+                    ) : (
                       <span className="price-eur">
-                        {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}
-                        {'\u00a0'}{data.currency ?? ''}
+                        {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency ?? ''}
                       </span>
                     )}
                   </div>
@@ -400,7 +363,6 @@ export default function Home() {
         zugelassenen Finanzberater. Datenquelle: Financial Modeling Prep, Yahoo Finance, Alpha Vantage, Finnhub.
       </footer>
 
-      <UsageBar refreshKey={usageKey} />
     </main>
   )
 }
