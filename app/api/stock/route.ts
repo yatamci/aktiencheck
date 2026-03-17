@@ -269,12 +269,14 @@ async function fromYahooFinance(ticker:string):Promise<Partial<StockMetrics>> {
 }
 
 async function fromStooq(ticker: string): Promise<Partial<StockMetrics>> {
-  // Stooq: free, no key, covers international stocks including HK, DE, etc.
-  // Format: AAPL.US, 1810.HK, BMW.DE, 7203.JP
+  // Stooq: free, no key, covers international stocks
+  // Format: AAPL.US, 1810.HK, BMW.DE, 7203.JP, 005930.KS
   let sym = ticker
   if (!ticker.includes('.')) sym = ticker + '.US'
-  else if (ticker.endsWith('.DE')) sym = ticker.replace('.DE', '.DE')
-  else if (ticker.endsWith('.HK')) sym = ticker  // already correct
+  else if (ticker.endsWith('.DE')) sym = ticker  // BMW.DE → BMW.DE ✓
+  else if (ticker.endsWith('.HK')) sym = ticker  // 1810.HK ✓
+  else if (ticker.endsWith('.KS')) sym = ticker  // 005930.KS ✓
+  else if (ticker.endsWith('.T'))  sym = ticker.replace('.T', '.JP') // 7203.T → 7203.JP
 
   try {
     const url = `https://stooq.com/q/d/l/?s=${sym.toLowerCase()}&i=d`
