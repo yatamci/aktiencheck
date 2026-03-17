@@ -130,6 +130,9 @@ const TICKER_DOMAINS: Record<string,string> = {
   SONY:'sony.com', BABA:'alibaba.com', BIDU:'baidu.com', NIO:'nio.com',
   RACE:'ferrari.com', NOK:'nokia.com', ERIC:'ericsson.com',
   T:'att.com', VZ:'verizon.com', TMUS:'t-mobile.com',
+  '005930.KS':'samsung.com', '1810.HK':'mi.com', '0700.HK':'tencent.com',
+  '9988.HK':'alibaba.com', '7203.T':'toyota.com', '6758.T':'sony.com',
+  '9984.T':'softbank.jp', 'SMSN.L':'samsung.com',
   EBAY:'ebay.com', ETSY:'etsy.com', W:'wayfair.com',
   SBUX:'starbucks.com', CMG:'chipotle.com', YUM:'yum.com',
   DAL:'delta.com', UAL:'united.com', AAL:'aa.com', MAR:'marriott.com',
@@ -140,13 +143,19 @@ function StockLogo({ symbol, name }: { symbol?: string; name?: string }) {
   const [imgSrc, setImgSrc]   = useState<string | null>(null)
   const [fallbackIdx, setFallbackIdx] = useState(0)
 
-  const domain = symbol ? (TICKER_DOMAINS[symbol.toUpperCase()] ?? (() => {
-    const base = (name ?? symbol)
-      .toLowerCase()
-      .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i, '')
-      .trim().replace(/[^a-z0-9]/g, '').slice(0, 20)
-    return base + '.com'
-  })()) : null
+  const domain = symbol ? (
+    TICKER_DOMAINS[symbol.toUpperCase()] ??
+    TICKER_DOMAINS[symbol] ??
+    (() => {
+      // Skip domain guessing for numeric/exchange tickers like 005930.KS
+      if (/^\d/.test(symbol)) return null
+      const base = (name ?? symbol)
+        .toLowerCase()
+        .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i, '')
+        .trim().replace(/[^a-z0-9]/g, '').slice(0, 20)
+      return base ? base + '.com' : null
+    })()
+  ) : null
 
   const sources = domain ? [
     `https://logo.clearbit.com/${domain}`,
