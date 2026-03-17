@@ -229,6 +229,8 @@ async function fromFinnhub(ticker:string,key:string):Promise<Partial<StockMetric
 }
 
 async function fromYahooFinance(ticker:string):Promise<Partial<StockMetrics>> {
+  // Yahoo uses 1810.HK, 005930.KS, 7203.T etc. directly - pass as-is
+  // For European stocks ending in .DE .PA etc - Yahoo also supports these
   const url2=`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=summaryDetail%2CdefaultKeyStatistics%2CfinancialData%2CassetProfile`
   const [chartRaw,summaryRaw]=await Promise.all([
     get(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`),
@@ -262,6 +264,33 @@ async function fromYahooFinance(ticker:string):Promise<Partial<StockMetrics>> {
       earningsGrowth:rn(fd,'earningsGrowth'),revenueGrowth:rn(fd,'revenueGrowth'),hist,
     }
   } catch{return{hist}}
+}
+
+async function fromStooq(ticker: string): Promise<Partial<StockMetrics>> {
+  // Stooq: free, no key, covers international stocks including HK, DE, etc.
+  // Format: AAPL.US, 1810.HK, BMW.DE, 7203.JP
+  let sym = ticker
+  if (!ticker.includes('.')) sym = ticker + '.US'
+  else if (ticker.endsWith('.DE')) sym = ticker.replace('.DE', '.DE')
+  else if (ticker.endsWith('.HK')) sym = ticker  // already correct
+
+  try {
+    const url = `https://stooq.com/q/d/l/?s=${sym.toLowerCase()}&i=d`
+    const r   = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(5000) })
+    const text = await r.text()
+    if (!text || text.includes('No data')) return {}
+    // Parse CSV: Date,Open,High,Low,Close,Volume
+    const lines = text.trim().split('\n').filter(l => !l.startsWith('Date'))
+    if (lines.length === 0) return {}
+    const latest = lines[lines.length - 1].split(',')
+    const close  = parseFloat(latest[4])
+    if (!isFinite(close)) return {}
+    // Build hist from CSV
+    const hist = lines
+      .map(l => { const p = l.split(','); return { date: p[0], close: parseFloat(p[4]) } })
+      .filter(h => isFinite(h.close) && h.close > 0)
+    return { price: close, hist }
+  } catch { return {} }
 }
 
 async function fromTwelveData(ticker:string,key:string):Promise<Partial<StockMetrics>> {
@@ -320,6 +349,11 @@ export async function GET(req:NextRequest) {
   if(!isFull(result)&&tdKey){
     const d=await fromTwelveData(ticker,tdKey)
     if(Object.values(d).some(v=>v!=null)){result=merge(result,d);_sources.push('TwelveData')}
+  }
+  // Stooq: free international fallback (no key needed), good for HK/DE/JP stocks
+  if(result.hist.length===0 || result.price==null){
+    const d=await fromStooq(ticker)
+    if(Object.values(d).some(v=>v!=null)){result=merge(result,d);_sources.push('Stooq')}
   }
 
   // EUR conversion with multiple fallbacks
