@@ -249,10 +249,10 @@ body {
   .metrics-grid {
     grid-template-columns: 1fr 1fr;
     gap: 0 16px;
-    align-items: stretch; /* both columns same height */
+    align-items: stretch;
   }
 }
-.grid-col       { display: flex; flex-direction: column; }
+.grid-col       { display: flex; flex-direction: column; height: 100%; }
 .category-section { }
 /* Spacer: grows to fill space, pushing RSI down to align with Nettomarge */
 .rsi-spacer { flex: 1; min-height: 0; }
@@ -367,12 +367,12 @@ body {
   .bottom-grid {
     grid-template-columns: 1fr 1fr;
     gap: 0 16px;
-    align-items: start;
+    align-items: stretch; /* equal height columns */
   }
 }
-/* Make overall-card fill height to align with chart */
-.bottom-grid > div { display: flex; flex-direction: column; }
-.bottom-grid .overall-card { flex: 1; }
+/* Make overall-card fill full column height */
+.bottom-grid > div { display: flex; flex-direction: column; height: 100%; }
+.bottom-grid .glass-card { flex: 1; }
 
 /* ────────────────────────────────────────────
    MA Chart
