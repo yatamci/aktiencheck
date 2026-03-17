@@ -146,13 +146,15 @@ async function resolveTicker(query:string,fmpKey:string):Promise<string> {
 
 // ─── Source fetchers ──────────────────────────────────────────────────────────
 async function fromFMP(ticker:string,key:string):Promise<Partial<StockMetrics>> {
+  // For HK stocks like 1810.HK, FMP may need the ticker without exchange suffix
+  // Try both formats
   const [pR,rR,mR,gR,tR,hR]=await Promise.all([
     get(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/ratios-ttm?symbol=${ticker}&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/key-metrics-ttm?symbol=${ticker}&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/financial-growth?symbol=${ticker}&limit=1&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/technical-indicator/daily?symbol=${ticker}&type=rsi&period=14&apikey=${key}`),
-    get(`https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${ticker}&limit=250&apikey=${key}`),
+    get(`https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${ticker}&limit=1300&apikey=${key}`),
   ])
   if(isLimited(pR)) return {}
   const p=first(pR),r=first(rR),m=first(mR),g=first(gR)
@@ -231,9 +233,9 @@ async function fromFinnhub(ticker:string,key:string):Promise<Partial<StockMetric
 async function fromYahooFinance(ticker:string):Promise<Partial<StockMetrics>> {
   // Yahoo uses 1810.HK, 005930.KS, 7203.T etc. directly - pass as-is
   // For European stocks ending in .DE .PA etc - Yahoo also supports these
-  const url2=`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=summaryDetail%2CdefaultKeyStatistics%2CfinancialData%2CassetProfile`
+  const url2=`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=summaryDetail%2CdefaultKeyStatistics%2CfinancialData%2CassetProfile`
   const [chartRaw,summaryRaw]=await Promise.all([
-    get(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`),
+    get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`),
     get(url2),
   ])
   let hist:StockMetrics['hist']=[]
@@ -333,9 +335,15 @@ export async function GET(req:NextRequest) {
 
   const ticker=await resolveTicker(query,fmpKey)
 
+  // For HK/Asian stocks, Yahoo is more reliable as primary
+  const isHK = ticker.endsWith('.HK') || ticker.endsWith('.KS') || ticker.endsWith('.T') || ticker.endsWith('.SS') || ticker.endsWith('.SZ')
   const [fmpData,yahooData]=await Promise.all([fromFMP(ticker,fmpKey),fromYahooFinance(ticker)])
-  let result=merge(empty(),fmpData); result=merge(result,yahooData)
-  const _sources=['FMP']
+  // For HK stocks, prefer Yahoo data over FMP (FMP often has incomplete HK data)
+  let result = isHK
+    ? merge(merge(empty(), yahooData), fmpData)  // Yahoo first, FMP fills gaps
+    : merge(merge(empty(), fmpData), yahooData)   // FMP first, Yahoo fills gaps
+  const _sources: string[] = []
+  if(Object.values(fmpData).some(v=>v!=null)) _sources.push('FMP')
   if(Object.values(yahooData).some(v=>v!=null)) _sources.push('Yahoo')
 
   if(!isFull(result)&&avKey){
