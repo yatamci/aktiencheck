@@ -257,7 +257,7 @@ body {
 /* Spacer: grows to fill space, pushing RSI down to align with Nettomarge */
 .rsi-spacer { flex: 1; min-height: 0; }
 .grid-col:last-child .category-section:last-child { display: flex; flex-direction: column; flex-shrink: 0; }
-.grid-col:last-child .category-section:last-child .section-title { margin-top: 0; }
+.grid-col:last-child .category-section:last-child .section-title { margin-top: 0 !important; }
 @media (max-width: 719px) { .rsi-spacer { display: none; } }
 
 .metrics-col    { display: flex; flex-direction: column; gap: 6px; }
@@ -410,9 +410,9 @@ body {
 .score-breakdown    { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
 .score-breakdown-row{ display: flex; align-items: center; gap: 8px; font-size: 0.77rem; color: var(--text-2); }
 .breakdown-dot      { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.score-ring         { position: relative; width: 130px; height: 130px; flex-shrink: 0; }
+.score-ring         { position: relative; width: 180px; height: 180px; flex-shrink: 0; }
 .score-ring-text    { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.score-ring-num     { font-family: 'DM Mono', monospace; font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.score-ring-num     { font-family: 'DM Mono', monospace; font-size: 2.2rem; font-weight: 700; line-height: 1; }
 .score-ring-label   { font-size: 0.62rem; color: var(--text-3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
 
 /* ────────────────────────────────────────────
@@ -466,7 +466,7 @@ body {
    Stock Header – restructured with company info
 ──────────────────────────────────────────── */
 .stock-header       { padding: 22px 24px 20px; margin-bottom: 14px; }
-.stock-header-top   { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-bottom: 14px; }
+.stock-header-top   { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .stock-identity     { display: flex; flex-direction: column; gap: 6px; }
 .stock-name         { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .stock-meta         { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -543,13 +543,13 @@ body {
 
 /* ── Stock logo ── */
 .stock-logo-wrap {
-  width: 56px; height: 56px; border-radius: 14px;
+  width: 52px; height: 52px; border-radius: 12px;
   background: var(--surface-solid); border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden; justify-self: center;
+  overflow: hidden; flex-shrink: 0;
 }
 .stock-logo-wrap:empty { background: transparent; border-color: transparent; }
-.stock-logo { width: 44px; height: 44px; object-fit: contain; display: block; }
+.stock-logo { width: 40px; height: 40px; object-fit: contain; display: block; border-radius: 8px; }
 
 /* ── Overall card restructure ── */
 .overall-top  { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;   padding: 24px 22px;
@@ -577,3 +577,26 @@ body {
 .usage-note  { font-size: 0.65rem; color: var(--text-3); margin-top: 8px; font-style: italic; }
 
 .price-both { display: inline-flex; align-items: baseline; white-space: nowrap; gap: 0; }
+
+/* RSI: push down so bottom of RSI = bottom of Nettomarge */
+@media (min-width: 720px) {
+  .grid-col:last-child { justify-content: flex-start; }
+  .grid-col:last-child .rsi-spacer { flex: 1; }
+}
+
+/* Stock identity group: logo left + name/ticker right */
+.stock-identity-group {
+  display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;
+}
+
+/* Mobile price layout */
+.price-desktop-only { display: inline-flex; align-items: baseline; gap: 0; white-space: nowrap; }
+.price-mobile-only  { display: none; flex-direction: column; align-items: flex-end; }
+.price-orig-sub     { font-size: 0.75rem; color: var(--text-3); font-weight: 400; margin-top: 2px; font-family: 'DM Mono', monospace; }
+@media (max-width: 600px) {
+  .price-desktop-only { display: none; }
+  .price-mobile-only  { display: flex; }
+  /* prevent price from overflowing */
+  .stock-price        { max-width: 130px; }
+  .price-eur          { font-size: 1.1rem; }
+}
