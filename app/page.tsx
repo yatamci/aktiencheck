@@ -19,15 +19,15 @@ const RIGHT_CATS = [
 
 // ── Score Ring ────────────────────────────────────────────────────────────────
 function ScoreRing({ pct, color }: { pct: number; color: string }) {
-  const r = 52, circ = 2 * Math.PI * r
+  const r = 72, circ = 2 * Math.PI * r
   const offset = circ * (1 - Math.min(1, Math.max(0, pct)))
   return (
     <div className="score-ring">
-      <svg width="130" height="130" viewBox="0 0 130 130">
-        <circle cx="65" cy="65" r={r} fill="none" strokeWidth="9" stroke="var(--border)" />
-        <circle cx="65" cy="65" r={r} fill="none" strokeWidth="9" stroke={color}
+      <svg width="180" height="180" viewBox="0 0 180 180">
+        <circle cx="90" cy="90" r={r} fill="none" strokeWidth="10" stroke="var(--border)" />
+        <circle cx="90" cy="90" r={r} fill="none" strokeWidth="10" stroke={color}
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition:'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', transform:'rotate(-90deg)', transformOrigin:'65px 65px' }}
+          style={{ transition:'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', transform:'rotate(-90deg)', transformOrigin:'90px 90px' }}
         />
       </svg>
       <div className="score-ring-text">
@@ -243,30 +243,39 @@ export default function Home() {
           {/* ── Stock Header ── */}
           <div className="glass-card stock-header">
             <div className="stock-header-top">
-              <div className="stock-identity">
-                <span className="stock-name">{data.name || data.symbol}</span>
-                <div className="stock-meta">
-                  {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
-                  {data.sector && <span className="stock-sector">{data.sector}</span>}
+              {/* Logo left + identity */}
+              <div className="stock-identity-group">
+                {data.symbol && (
+                  <div className="stock-logo-wrap">
+                    <StockLogo symbol={data.symbol} name={data.name} />
+                  </div>
+                )}
+                <div className="stock-identity">
+                  <span className="stock-name">{data.name || data.symbol}</span>
+                  <div className="stock-meta">
+                    {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
+                    {data.sector && <span className="stock-sector">{data.sector}</span>}
+                  </div>
                 </div>
               </div>
-
-              {/* Logo in center – tries multiple sources */}
-              {data.symbol && (
-                <div className="stock-logo-wrap">
-                  <StockLogo symbol={data.symbol} name={data.name} />
-                </div>
-              )}
 
               {data.price != null && (
                 <div className="stock-price">
                   <div className="price-value">
                     {data.priceEur != null && data.currency !== 'EUR' ? (
-                      <span className="price-both">
-                        <span className="price-orig">{Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}</span>
-                        <span className="price-sep">{' | '}</span>
-                        <span className="price-eur">{Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' €'}</span>
-                      </span>
+                      <>
+                        {/* Desktop: side by side with | */}
+                        <span className="price-desktop-only">
+                          <span className="price-orig">{Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}</span>
+                          <span className="price-sep">{' | '}</span>
+                          <span className="price-eur">{Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' €'}</span>
+                        </span>
+                        {/* Mobile: EUR on top, original below */}
+                        <span className="price-mobile-only">
+                          <span className="price-eur">{Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' €'}</span>
+                          <span className="price-orig-sub">{Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}</span>
+                        </span>
+                      </>
                     ) : (
                       <span className="price-eur">
                         {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency ?? ''}
