@@ -592,10 +592,6 @@ body {
 /* Mobile price layout */
 .price-desktop-only { display: inline-flex; align-items: baseline; gap: 0; white-space: nowrap; }
 .price-mobile-only  { display: none; flex-direction: column; align-items: flex-end; }
-.price-orig-sub     { font-size: 0.75rem; color: var(--text-3); font-weight: 400; margin-top: 2px; font-family: 'DM Mono', monospace; }
-
-  .price-eur          { font-size: 1.1rem; }
-}
 
 /* ── Mobile price: stacked layout ── */
 @media (max-width: 600px) {
