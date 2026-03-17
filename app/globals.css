@@ -255,7 +255,7 @@ body {
 .grid-col       { display: flex; flex-direction: column; height: 100%; }
 .category-section { }
 /* Spacer: grows to fill space, pushing RSI down to align with Nettomarge */
-.rsi-spacer { flex: 1; min-height: 0; }
+.rsi-spacer { flex: 1; min-height: 66px; }
 .grid-col:last-child .category-section:last-child { display: flex; flex-direction: column; flex-shrink: 0; }
 .grid-col:last-child .category-section:last-child .section-title { margin-top: 0 !important; }
 @media (max-width: 719px) { .rsi-spacer { display: none; } }
@@ -543,13 +543,13 @@ body {
 
 /* ── Stock logo ── */
 .stock-logo-wrap {
-  width: 52px; height: 52px; border-radius: 12px;
+  width: 64px; height: 64px; border-radius: 14px;
   background: var(--surface-solid); border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden; flex-shrink: 0;
+  overflow: hidden; flex-shrink: 0; align-self: stretch;
 }
 .stock-logo-wrap:empty { background: transparent; border-color: transparent; }
-.stock-logo { width: 40px; height: 40px; object-fit: contain; display: block; border-radius: 8px; }
+.stock-logo { width: 50px; height: 50px; object-fit: contain; display: block; border-radius: 10px; }
 
 /* ── Overall card restructure ── */
 .overall-top  { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;   padding: 24px 22px;
@@ -593,10 +593,26 @@ body {
 .price-desktop-only { display: inline-flex; align-items: baseline; gap: 0; white-space: nowrap; }
 .price-mobile-only  { display: none; flex-direction: column; align-items: flex-end; }
 .price-orig-sub     { font-size: 0.75rem; color: var(--text-3); font-weight: 400; margin-top: 2px; font-family: 'DM Mono', monospace; }
-@media (max-width: 600px) {
-  .price-desktop-only { display: none; }
-  .price-mobile-only  { display: flex; }
-  /* prevent price from overflowing */
-  .stock-price        { max-width: 130px; }
+
   .price-eur          { font-size: 1.1rem; }
+}
+
+/* ── Mobile price: stacked layout ── */
+@media (max-width: 600px) {
+  .price-desktop-only { display: none !important; }
+  .price-mobile-only  { display: flex !important; flex-direction: column; align-items: flex-end; gap: 0; }
+  /* EUR price = same visual weight as stock-name */
+  .price-mobile-only .price-eur {
+    font-size: 1.35rem; font-weight: 700; color: var(--text); line-height: 1.2;
+  }
+  /* original currency = same level as .stock-symbol */
+  .price-mobile-only .price-orig-sub {
+    font-size: 0.77rem; color: var(--text-3); font-weight: 400;
+    font-family: 'DM Mono', monospace; margin-top: 4px;
+  }
+  /* Stand date = same level as .stock-sector */
+  .price-date { font-size: 0.68rem; margin-top: 4px; }
+  /* align stock-header-top items to top so rows line up */
+  .stock-header-top { align-items: flex-start; }
+  .stock-identity-group { align-items: flex-start; }
 }
