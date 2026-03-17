@@ -255,7 +255,9 @@ body {
 .grid-col       { display: flex; flex-direction: column; }
 .category-section { }
 /* Spacer: grows to fill space, pushing RSI down to align with Nettomarge */
-.rsi-spacer { flex: 1; }
+.rsi-spacer { flex: 1; min-height: 0; }
+.grid-col:last-child .category-section:last-child { display: flex; flex-direction: column; flex-shrink: 0; }
+.grid-col:last-child .category-section:last-child .section-title { margin-top: 0; }
 @media (max-width: 719px) { .rsi-spacer { display: none; } }
 
 .metrics-col    { display: flex; flex-direction: column; gap: 6px; }
@@ -401,7 +403,7 @@ body {
 /* ────────────────────────────────────────────
    Overall Score
 ──────────────────────────────────────────── */
-.overall-card  { padding: 24px 22px; display: flex; flex-direction: column; justify-content: space-between; }
+.overall-card  { padding: 0; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
 .overall-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .overall-left h3    { font-size: 0.9rem; font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
 .overall-label      { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; }
@@ -523,10 +525,9 @@ body {
 
 /* ── Recommendation ── */
 .recommendation {
-  margin-top: 0;
-  padding-top: 18px;
-  padding-bottom: 4px;
+  padding: 18px 22px 20px;
   border-top: 1px solid var(--border);
+  margin: 0;
 }
 .rec-action {
   font-size: 0.95rem;
@@ -551,7 +552,8 @@ body {
 .stock-logo { width: 44px; height: 44px; object-fit: contain; display: block; }
 
 /* ── Overall card restructure ── */
-.overall-top  { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.overall-top  { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;   padding: 24px 22px;
+}
 .overall-left { flex: 1; }
 .overall-right { flex-shrink: 0; }
 
@@ -573,3 +575,5 @@ body {
 .usage-fill  { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.6s ease; }
 .usage-count { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--text-3); min-width: 55px; text-align: right; }
 .usage-note  { font-size: 0.65rem; color: var(--text-3); margin-top: 8px; font-style: italic; }
+
+.price-both { display: inline-flex; align-items: baseline; white-space: nowrap; gap: 0; }
