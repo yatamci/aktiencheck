@@ -105,7 +105,6 @@ function getRecommendation(metrics: MetricResult[], crossSignal?: string): {
 }
 
 // ── Stock Logo ────────────────────────────────────────────────────────────────
-// logo.dev: free, reliable, 100k logos, works by domain name
 const TICKER_DOMAINS: Record<string,string> = {
   AAPL:'apple.com', MSFT:'microsoft.com', GOOGL:'google.com', GOOG:'google.com',
   AMZN:'amazon.com', TSLA:'tesla.com', META:'meta.com', NVDA:'nvidia.com',
@@ -138,35 +137,39 @@ const TICKER_DOMAINS: Record<string,string> = {
 }
 
 function StockLogo({ symbol, name }: { symbol?: string; name?: string }) {
-  const [imgSrc, setImgSrc] = useState<string | null>(null)
-  const [errCount, setErrCount] = useState(0)
+  const [imgSrc, setImgSrc]   = useState<string | null>(null)
+  const [fallbackIdx, setFallbackIdx] = useState(0)
+
+  const domain = symbol ? (TICKER_DOMAINS[symbol.toUpperCase()] ?? (() => {
+    const base = (name ?? symbol)
+      .toLowerCase()
+      .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i, '')
+      .trim().replace(/[^a-z0-9]/g, '').slice(0, 20)
+    return base + '.com'
+  })()) : null
+
+  const sources = domain ? [
+    `https://logo.clearbit.com/${domain}`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+  ] : []
 
   useEffect(() => {
-    if (!symbol) return
-    setErrCount(0)
-    const domain = TICKER_DOMAINS[symbol.toUpperCase()]
-    if (domain) {
-      setImgSrc(`https://img.logo.dev/${domain}?token=pk_TCDtCNyHT5KWRmFOWcuaVw&size=80`)
-    } else {
-      // Derive domain from company name or symbol
-      const base = (name ?? symbol)
-        .toLowerCase()
-        .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i, '')
-        .trim()
-        .replace(/[^a-z0-9]/g, '')
-        .slice(0, 20)
-      setImgSrc(`https://img.logo.dev/${base}.com?token=pk_TCDtCNyHT5KWRmFOWcuaVw&size=80`)
-    }
+    if (sources.length > 0) { setImgSrc(sources[0]); setFallbackIdx(0) }
   }, [symbol, name])
 
-  if (!imgSrc || errCount > 0) return null
+  if (!imgSrc || fallbackIdx >= sources.length) return null
 
   return (
     <img
-      src={imgSrc}
+      src={sources[fallbackIdx]}
       alt=""
       className="stock-logo"
-      onError={() => setErrCount(n => n + 1)}
+      onError={() => {
+        const next = fallbackIdx + 1
+        if (next < sources.length) { setFallbackIdx(next); setImgSrc(sources[next]) }
+        else setImgSrc(null)
+      }}
     />
   )
 }
