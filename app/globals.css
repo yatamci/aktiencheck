@@ -252,10 +252,10 @@ body {
     align-items: stretch;
   }
 }
-.grid-col       { display: flex; flex-direction: column; height: 100%; }
+.grid-col       { display: flex; flex-direction: column; min-height: 0; }
 .category-section { }
 /* Spacer: grows to fill space, pushing RSI down to align with Nettomarge */
-.rsi-spacer { flex: 1; min-height: 66px; }
+.rsi-spacer { flex: 1; min-height: 44px; }
 .grid-col:last-child .category-section:last-child { display: flex; flex-direction: column; flex-shrink: 0; }
 .grid-col:last-child .category-section:last-child .section-title { margin-top: 0 !important; }
 @media (max-width: 719px) { .rsi-spacer { display: none; } }
@@ -466,13 +466,13 @@ body {
    Stock Header – restructured with company info
 ──────────────────────────────────────────── */
 .stock-header       { padding: 22px 24px 20px; margin-bottom: 14px; }
-.stock-header-top   { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.stock-header-top   { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px; margin-bottom: 14px; }
 .stock-identity     { display: flex; flex-direction: column; gap: 6px; }
 .stock-name         { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .stock-meta         { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stock-symbol       { font-family: 'DM Mono', monospace; font-size: 0.77rem; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 3px 10px; border-radius: 999px; }
 .stock-sector       { font-size: 0.8rem; color: var(--text-2); font-weight: 500; }
-.stock-price        { text-align: right; justify-self: end; }
+.stock-price        { text-align: right; min-width: 0; overflow: hidden; }
 .price-value        { font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 600; color: var(--text); }
 .price-label        { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
 
@@ -578,15 +578,11 @@ body {
 
 .price-both { display: inline-flex; align-items: baseline; white-space: nowrap; gap: 0; }
 
-/* RSI: push down so bottom of RSI = bottom of Nettomarge */
-@media (min-width: 720px) {
-  .grid-col:last-child { justify-content: flex-start; }
-  .grid-col:last-child .rsi-spacer { flex: 1; }
-}
+
 
 /* Stock identity group: logo left + name/ticker right */
 .stock-identity-group {
-  display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 12px; min-width: 0; overflow: hidden;
 }
 
 /* Mobile price layout */
@@ -612,3 +608,13 @@ body {
   .stock-header-top { align-items: flex-start; }
   .stock-identity-group { align-items: flex-start; }
 }
+
+/* Wikipedia link */
+.wiki-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.wiki-link:hover { border-bottom-color: var(--accent); }
