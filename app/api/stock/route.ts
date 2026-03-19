@@ -25,6 +25,7 @@ function merge(base:StockMetrics, patch:Partial<StockMetrics>): StockMetrics {
   for (const k of Object.keys(patch) as (keyof StockMetrics)[]) {
     const v=patch[k]; if(v==null) continue
     if(k==='hist'){ if(out.hist.length===0&&Array.isArray(v)) out.hist=v as StockMetrics['hist'] }
+    else if(k==='historicalRatios'){ if((!out.historicalRatios||out.historicalRatios.length===0)&&Array.isArray(v)) out.historicalRatios=v as Record<string,unknown>[] }
     else if(out[k]==null)(out as Record<string,unknown>)[k]=v
   }
   return out
@@ -450,12 +451,12 @@ export async function GET(req:NextRequest) {
         return []
       }
       return {
-        pe:            mapRowMulti('priceEarningsRatio','peRatio','pe'),
-        ps:            mapRowMulti('priceToSalesRatio','psRatio','ps'),
-        pb:            mapRowMulti('priceToBookRatio','pbRatio','pb'),
-        roe:           mapRowMulti('returnOnEquity','roe'),
-        netMargin:     mapRowMulti('netProfitMargin','netMargin'),
-        revenueGrowth: mapRowMulti('revenueGrowth','revenue_growth'),
+        pe:            mapRowMulti('peRatio','priceEarningsRatio','pe','priceEarningsRatioTTM'),
+        ps:            mapRowMulti('priceToSalesRatio','psRatio','ps','priceToSalesRatioTTM'),
+        pb:            mapRowMulti('priceToBookRatio','pbRatio','pb','priceToBookRatioTTM'),
+        roe:           mapRowMulti('returnOnEquity','roe','returnOnEquityTTM'),
+        netMargin:     mapRowMulti('netProfitMargin','netMargin','netProfitMarginTTM'),
+        revenueGrowth: mapRowMulti('revenueGrowth','revenue_growth','revenueGrowthTTM'),
       }
     })(),
   })
