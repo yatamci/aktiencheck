@@ -7,8 +7,8 @@ import MetricCard     from '../components/MetricCard'
 import SearchBar      from '../components/SearchBar'
 import MAChart        from '../components/MAChart'
 import MiniChart      from '../components/MiniChart'
-import { StockData, buildMetrics, calculateOverallScore, MetricResult } from '../lib/evaluate'
-import { Lang, T, Translations } from '../lib/i18n'
+import { StockData, buildMetrics, calculateOverallScore, MetricResult, Lang } from '../lib/evaluate'
+import { T, Translations } from '../lib/i18n'
 
 // ── Category definitions ───────────────────────────────────────────────────
 const LEFT_CATS  = [
@@ -347,7 +347,7 @@ export default function Home() {
   const warnCount  = metrics.filter(m => m.score === 'warn').length
   const badCount   = metrics.filter(m => m.score === 'bad').length
 
-  // RSI alignment
+  // RSI alignment: bottom of RSI card = bottom of Nettomarge card
   useEffect(() => {
     if (!data) return
     const align = () => {
@@ -356,13 +356,21 @@ export default function Home() {
       const rsiEl   = document.querySelector('[data-key="rsi"]') as HTMLElement
       const spacer  = document.querySelector('.rsi-spacer') as HTMLElement
       if (!nettoEl || !rsiEl || !spacer) return
-      spacer.style.flexGrow = '0'; spacer.style.height = '0px'
-      requestAnimationFrame(() => {
-        const diff = nettoEl.getBoundingClientRect().bottom - rsiEl.getBoundingClientRect().bottom
-        if (diff !== 0) spacer.style.height = Math.max(0, diff) + 'px'
-      })
+      // Step 1: reset spacer
+      spacer.style.height = '0px'
+      spacer.style.flexGrow = '0'
+      // Step 2: wait TWO animation frames so layout has fully reflowed
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const nettoBottom = nettoEl.getBoundingClientRect().bottom
+        const rsiBottom   = rsiEl.getBoundingClientRect().bottom
+        const diff = nettoBottom - rsiBottom
+        // diff > 0 means RSI is above Nettomarge → add height
+        // diff < 0 means RSI is below Nettomarge → should not happen but clamp to 0
+        spacer.style.height = Math.max(0, diff) + 'px'
+      }))
     }
-    const timers = [50,200,500].map(d => setTimeout(align, d))
+    // Multiple attempts as images/fonts may shift layout
+    const timers = [100, 400, 900].map(d => setTimeout(align, d))
     window.addEventListener('resize', align)
     return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', align) }
   }, [data, metrics])
@@ -499,7 +507,7 @@ export default function Home() {
                   <div className="overall-top">
                     <div className="overall-left">
                       <h3>{t.scoreTitle}</h3>
-                      <div className="overall-label" style={{color:overall.color}}>{overall.label}</div>
+                      <div className="overall-label" style={{color:overall.color}}>{langState === 'en' ? (overall as any).labelEn ?? overall.label : overall.label}</div>
                       <div className="score-breakdown">
                         <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--good)'}}/>{goodCount} {t.criteriaGood}</div>
                         <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--warn)'}}/>{warnCount} {t.criteriaMid}</div>
