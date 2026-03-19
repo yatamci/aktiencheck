@@ -466,13 +466,13 @@ body {
    Stock Header – restructured with company info
 ──────────────────────────────────────────── */
 .stock-header       { padding: 22px 24px 20px; margin-bottom: 14px; }
-.stock-header-top   { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px; margin-bottom: 14px; }
+
 .stock-identity     { display: flex; flex-direction: column; gap: 6px; }
 .stock-name         { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .stock-meta         { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stock-symbol       { font-family: 'DM Mono', monospace; font-size: 0.77rem; font-weight: 600; color: var(--accent); background: var(--accent-bg); padding: 3px 10px; border-radius: 999px; }
 .stock-sector       { font-size: 0.8rem; color: var(--text-2); font-weight: 500; }
-.stock-price        { text-align: right; min-width: 0; overflow: hidden; }
+
 .price-value        { font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 600; color: var(--text); }
 .price-label        { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
 
@@ -576,38 +576,17 @@ body {
 .usage-count { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--text-3); min-width: 55px; text-align: right; }
 .usage-note  { font-size: 0.65rem; color: var(--text-3); margin-top: 8px; font-style: italic; }
 
-.price-both { display: inline-flex; align-items: baseline; white-space: nowrap; gap: 0; }
+
 
 
 
 /* Stock identity group: logo left + name/ticker right */
-.stock-identity-group {
-  display: flex; align-items: center; gap: 12px; min-width: 0; overflow: hidden;
-}
+
 
 /* Mobile price layout */
-.price-desktop-only { display: inline-flex; align-items: baseline; gap: 0; white-space: nowrap; }
-.price-mobile-only  { display: none; flex-direction: column; align-items: flex-end; }
 
-/* ── Mobile price: stacked layout ── */
-@media (max-width: 600px) {
-  .price-desktop-only { display: none !important; }
-  .price-mobile-only  { display: flex !important; flex-direction: column; align-items: flex-end; gap: 0; }
-  /* EUR price = same visual weight as stock-name */
-  .price-mobile-only .price-eur {
-    font-size: 1.35rem; font-weight: 700; color: var(--text); line-height: 1.2;
-  }
-  /* original currency = same level as .stock-symbol */
-  .price-mobile-only .price-orig-sub {
-    font-size: 0.77rem; color: var(--text-3); font-weight: 400;
-    font-family: 'DM Mono', monospace; margin-top: 4px;
-  }
-  /* Stand date = same level as .stock-sector */
-  .price-date { font-size: 0.68rem; margin-top: 4px; }
-  /* align stock-header-top items to top so rows line up */
-  .stock-header-top { align-items: flex-start; }
-  .stock-identity-group { align-items: flex-start; }
-}
+
+
 
 /* Wikipedia link */
 .wiki-link {
@@ -618,3 +597,66 @@ body {
   transition: border-color 0.15s;
 }
 .wiki-link:hover { border-bottom-color: var(--accent); }
+
+/* ═══════════════════════════════════════════
+   Stock Header – 3-column layout
+   Col1: Logo | Col2: Identity | Col3: Price
+   Row heights match naturally between col2+col3
+═══════════════════════════════════════════ */
+.stock-header-top {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* Identity col */
+.stock-identity   { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stock-name       { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Price col – rows align with identity rows */
+.stock-price      { text-align: right; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+
+/* Row 1: EUR price – same visual weight as stock-name */
+.price-eur-main {
+  font-family: 'DM Mono', monospace;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* Row 2: original currency – same size as stock-symbol badge */
+.price-orig-main {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.77rem;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* Desktop: show "USD | EUR" in row 2 instead of separate EUR row */
+.price-sep-desktop { display: none; }
+@media (min-width: 601px) {
+  .price-eur-main    { font-size: 1.5rem; }
+  .price-sep-desktop { display: inline; color: var(--text-3); font-weight: 300; }
+}
+
+/* Row 3: date */
+.price-date {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  font-family: 'DM Mono', monospace;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* Mobile: ensure name doesn't overflow */
+@media (max-width: 600px) {
+  .stock-header-top { gap: 10px; }
+  .stock-name       { font-size: 1.05rem; }
+  .price-eur-main   { font-size: 1.05rem; }
+}
