@@ -689,19 +689,21 @@ body {
 }
 .stock-identity   { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stock-name       { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stock-price      { display: flex; flex-direction: column; gap: 5px; text-align: right; }
+.stock-price      { display: flex; flex-direction: column; gap: 0; text-align: right; }
 
 /* EUR value: bold, prominent */
 .price-eur-main {
   font-family: 'DM Mono', monospace;
   font-size: 1.35rem; font-weight: 700; color: var(--text);
-  white-space: nowrap; line-height: 1.2;
+  white-space: nowrap; line-height: 1;
+  margin-bottom: 5px;
 }
 /* Original currency (USD etc): light weight, muted */
 .price-orig-main {
   font-family: 'DM Mono', monospace;
   font-size: 0.82rem; font-weight: 400; color: var(--text-3);
-  white-space: nowrap; line-height: 1.2;
+  white-space: nowrap; line-height: 1;
+  margin-bottom: 5px;
 }
 .price-date {
   font-family: 'DM Mono', monospace;
@@ -748,3 +750,12 @@ body {
 
 /* Ensure emoji flags render */
 .theme-toggle, .lang-flag { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
+
+/* Language toggle: center the flag/text */
+.lang-toggle {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.1rem !important;
+  line-height: 1 !important;
+}
