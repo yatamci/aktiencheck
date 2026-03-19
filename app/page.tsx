@@ -96,8 +96,9 @@ function CompanyInfo({ data, t, lang }: { data: StockData; t: Translations; lang
     data.ceo       && `👤 ${t.ceoLabel}: ${data.ceo}`,
   ].filter(Boolean) as string[]
 
-  const wikiName = (data.name ?? '').replace(/\s+/g, '_').replace(/&/g, '%26')
-  const wikiUrl  = wikiName ? `https://de.wikipedia.org/wiki/${wikiName}` : null
+  // Use Wikipedia search API for more reliable article finding
+  const wikiQuery = encodeURIComponent(data.name ?? data.symbol ?? '')
+  const wikiUrl   = wikiQuery ? `https://de.wikipedia.org/w/index.php?search=${wikiQuery}&ns0=1` : null
 
   return (
     <div className="company-info">
@@ -333,6 +334,10 @@ export default function Home() {
 
   const search = useCallback(async (symbol: string) => {
     setLoading(true); setError(null); setData(null); setRateLimited(false)
+    // Update URL for shareable links
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `?s=${encodeURIComponent(symbol)}`)
+    }
     try {
       const res  = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`)
       const json: StockData & { rateLimited?: boolean } = await res.json()
@@ -343,6 +348,23 @@ export default function Home() {
     finally   { setLoading(false) }
   }, [langState])
 
+  // On mount: check URL for ?s= parameter
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const sym = params.get('s')
+    if (sym) search(sym)
+  }, [])
+
+  // Update document title when stock loads
+  useEffect(() => {
+    if (data?.name) {
+      document.title = `${data.name} – ${langState === 'de' ? 'Aktiencheck' : 'StockCheck'}`
+    } else {
+      document.title = langState === 'de' ? 'Aktiencheck' : 'StockCheck'
+    }
+  }, [data, langState])
+
   const metrics    = data ? buildMetrics(data) : []
   const metricsMap = Object.fromEntries(metrics.map(m => [m.key, m]))
   const overall    = metrics.length > 0 ? calculateOverallScore(metrics) : null
@@ -350,36 +372,40 @@ export default function Home() {
   const warnCount  = metrics.filter(m => m.score === 'warn').length
   const badCount   = metrics.filter(m => m.score === 'bad').length
 
-  // RSI alignment: bottom of RSI = bottom of Nettomarge
+  // RSI alignment: bottom of RSI card = bottom of Nettomarge card
   useEffect(() => {
-    if (!data) return
-    let rafId = 0
+    if (!data || typeof window === 'undefined') return
+    let running = false
     const align = () => {
-      cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(() => {
-        if (window.innerWidth < 720) return
-        const nettoEl = document.querySelector('[data-key="netMargin"]') as HTMLElement
-        const rsiEl   = document.querySelector('[data-key="rsi"]') as HTMLElement
-        const spacer  = document.querySelector('.rsi-spacer') as HTMLElement
-        if (!nettoEl || !rsiEl || !spacer) return
-        // Reset first, measure in next frame after reflow
-        spacer.style.cssText = 'height:0px;flex-grow:0;flex-shrink:0'
-        requestAnimationFrame(() => {
-          const diff = nettoEl.getBoundingClientRect().bottom - rsiEl.getBoundingClientRect().bottom
-          spacer.style.height = Math.max(0, diff) + 'px'
-        })
-      })
+      if (running || window.innerWidth < 720) return
+      running = true
+      // Use setTimeout to ensure DOM is fully painted
+      setTimeout(() => {
+        const nettoEl = document.querySelector('[data-key="netMargin"]') as HTMLElement | null
+        const rsiEl   = document.querySelector('[data-key="rsi"]')       as HTMLElement | null
+        const spacer  = document.querySelector('.rsi-spacer')            as HTMLElement | null
+        if (nettoEl && rsiEl && spacer) {
+          // Reset spacer completely first
+          spacer.style.cssText = 'height:0px;flex-shrink:0;min-height:0'
+          // Wait for browser to reflow with height=0
+          setTimeout(() => {
+            const nb = nettoEl.getBoundingClientRect().bottom
+            const rb = rsiEl.getBoundingClientRect().bottom
+            const needed = Math.max(0, nb - rb)
+            spacer.style.height = needed + 'px'
+          }, 16)
+        }
+        running = false
+      }, 0)
     }
-    // Observe the grid for size changes (more reliable than setTimeout)
-    const grid = document.querySelector('.metrics-grid')
-    const ro = grid ? new ResizeObserver(align) : null
-    ro?.observe(grid!)
-    const timers = [50, 200, 600, 1200].map(d => setTimeout(align, d))
+    // Run on every possible trigger
+    const timers = [0, 100, 300, 700, 1500].map(d => setTimeout(align, d))
+    const ro = new ResizeObserver(align)
+    document.querySelectorAll('.metric-card').forEach(el => ro.observe(el))
     window.addEventListener('resize', align)
     return () => {
-      cancelAnimationFrame(rafId)
-      ro?.disconnect()
       timers.forEach(clearTimeout)
+      ro.disconnect()
       window.removeEventListener('resize', align)
     }
   }, [data, metrics])
@@ -432,7 +458,18 @@ export default function Home() {
             <div className="stock-header-top">
               {data.symbol && <div className="stock-logo-wrap"><StockLogo symbol={data.symbol} name={data.name} /></div>}
               <div className="stock-identity">
-                <span className="stock-name">{data.name || data.symbol}</span>
+                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                  <span className="stock-name">{data.name || data.symbol}</span>
+                  <button
+                    className="share-btn"
+                    title={langState==='de'?'Link kopieren':'Copy link'}
+                    onClick={() => {
+                      navigator.clipboard?.writeText(window.location.href)
+                        .then(() => {/* copied */})
+                        .catch(() => {})
+                    }}
+                  >🔗</button>
+                </div>
                 <div className="stock-meta">
                   {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
                   {data.sector && <span className="stock-sector">{data.sector}</span>}
