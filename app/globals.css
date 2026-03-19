@@ -598,19 +598,6 @@ body {
 }
 .wiki-link:hover { border-bottom-color: var(--accent); }
 
-/* ═══════════════════════════════════════════
-   Stock Header – 3-column layout
-   Col1: Logo | Col2: Identity | Col3: Price
-   Row heights match naturally between col2+col3
-═══════════════════════════════════════════ */
-.stock-header-top {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
 /* Identity col */
 .stock-identity   { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stock-name       { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -689,3 +676,76 @@ body {
 }
 .translate-btn:hover { background: var(--accent); color: #fff; }
 .translate-btn:disabled { opacity: 0.5; cursor: wait; }
+
+/* ════════════════════════════════════════
+   Stock Header – 3-col grid + price rows
+════════════════════════════════════════ */
+.stock-header-top {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.stock-identity   { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stock-name       { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stock-price      { display: flex; flex-direction: column; gap: 5px; text-align: right; }
+
+/* EUR value: bold, prominent */
+.price-eur-main {
+  font-family: 'DM Mono', monospace;
+  font-size: 1.35rem; font-weight: 700; color: var(--text);
+  white-space: nowrap; line-height: 1.2;
+}
+/* Original currency (USD etc): light weight, muted */
+.price-orig-main {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82rem; font-weight: 400; color: var(--text-3);
+  white-space: nowrap; line-height: 1.2;
+}
+.price-date {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem; color: var(--text-3);
+  white-space: nowrap; line-height: 1.2;
+}
+.price-time-desktop { display: inline; }
+
+@media (min-width: 601px) {
+  .price-eur-main { font-size: 1.5rem; }
+}
+@media (max-width: 600px) {
+  .stock-header-top { gap: 10px; }
+  .stock-name       { font-size: 1.05rem; }
+  .price-eur-main   { font-size: 1.05rem; }
+  .price-time-desktop { display: none; }
+  /* On mobile: orig row becomes smaller, below EUR */
+  .price-desktop-row1 { order: 2; font-size: 0.72rem; }
+  .price-desktop-row2 { order: 1; }
+}
+
+/* ── Price target: same width as chart (left half of bottom-grid) ── */
+.pt-outer { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+@media (max-width: 719px) { .pt-outer { grid-template-columns: 1fr; } }
+.pt-outer .section-title { grid-column: 1; }
+.pt-outer .price-target-card { grid-column: 1; }
+
+.price-target-card { padding: 18px 20px; }
+
+/* Table layout: label | orig | eur – all aligned */
+.pt-grid       { display: flex; flex-direction: column; gap: 0; margin-bottom: 10px; }
+.pt-header-row { display: grid; grid-template-columns: 1fr auto auto; gap: 0 16px; padding: 0 0 6px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.pt-col-label  { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); }
+.pt-col-header { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); text-align: right; min-width: 72px; }
+.pt-row        { display: grid; grid-template-columns: 1fr auto auto; gap: 0 16px; padding: 6px 0; border-bottom: 1px solid var(--border); align-items: start; }
+.pt-avg-row    { border-bottom: none; padding-top: 10px; }
+.pt-label      { font-size: 0.78rem; color: var(--text-2); }
+.pt-label-bold { font-weight: 600; color: var(--text); }
+.pt-val-orig   { font-family: 'DM Mono', monospace; font-size: 0.82rem; font-weight: 400; color: var(--text-3); text-align: right; min-width: 72px; white-space: nowrap; }
+.pt-val-eur    { font-family: 'DM Mono', monospace; font-size: 0.9rem; font-weight: 600; color: var(--text); text-align: right; min-width: 72px; white-space: nowrap; }
+.pt-val-eur-wrap { display: flex; flex-direction: column; align-items: flex-end; min-width: 72px; }
+.pt-val-eur-bold { font-size: 1rem; font-weight: 700; }
+.pt-pct        { font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 600; margin-top: 2px; }
+.pt-disclaimer { font-size: 0.65rem; color: var(--text-3); font-style: italic; margin-top: 6px; }
+
+/* Ensure emoji flags render */
+.theme-toggle, .lang-flag { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
