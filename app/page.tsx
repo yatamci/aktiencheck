@@ -229,24 +229,32 @@ export default function Home() {
   useEffect(() => {
     if (!data) return
     const align = () => {
+      if (window.innerWidth < 720) return
       const nettoEl = document.querySelector('[data-key="netMargin"]') as HTMLElement
       const rsiEl   = document.querySelector('[data-key="rsi"]') as HTMLElement
       const spacer  = document.querySelector('.rsi-spacer') as HTMLElement
-      if (!nettoEl || !rsiEl || !spacer || window.innerWidth < 720) return
-      const nettoBottom = nettoEl.getBoundingClientRect().bottom
-      const rsiTop      = rsiEl.getBoundingClientRect().top
-      const currentSpacer = spacer.offsetHeight
-      // We want rsiEl bottom = nettoEl bottom → rsiTop = nettoBottom - rsiEl.offsetHeight
-      const targetRsiTop = nettoBottom - rsiEl.offsetHeight
-      const diff = targetRsiTop - rsiTop
-      const newHeight = Math.max(0, currentSpacer + diff)
+      if (!nettoEl || !rsiEl || !spacer) return
+      // Reset spacer first for accurate measurement
       spacer.style.flexGrow = '0'
-      spacer.style.height = newHeight + 'px'
+      spacer.style.height   = '0px'
+      // After reset, measure
+      requestAnimationFrame(() => {
+        const nettoRect = nettoEl.getBoundingClientRect()
+        const rsiRect   = rsiEl.getBoundingClientRect()
+        // We want bottom of RSI = bottom of Nettomarge
+        const needed = (nettoRect.bottom - rsiRect.bottom)
+        if (needed !== 0) {
+          spacer.style.height = Math.max(0, needed) + 'px'
+        }
+      })
     }
-    // Run after render and on resize
-    const timer = setTimeout(align, 100)
+    const timers = [
+      setTimeout(align, 50),
+      setTimeout(align, 200),
+      setTimeout(align, 500),
+    ]
     window.addEventListener('resize', align)
-    return () => { clearTimeout(timer); window.removeEventListener('resize', align) }
+    return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', align) }
   }, [data, metrics])
 
   return (
@@ -292,52 +300,45 @@ export default function Home() {
           {/* ── Stock Header ── */}
           <div className="glass-card stock-header">
             <div className="stock-header-top">
-              {/* Logo left + identity */}
-              <div className="stock-identity-group">
-                {data.symbol && (
-                  <div className="stock-logo-wrap">
-                    <StockLogo symbol={data.symbol} name={data.name} />
-                  </div>
-                )}
-                <div className="stock-identity">
-                  <span className="stock-name">{data.name || data.symbol}</span>
-                  <div className="stock-meta">
-                    {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
-                    {data.sector && <span className="stock-sector">{data.sector}</span>}
-                  </div>
+
+              {/* Col 1: Logo */}
+              {data.symbol && (
+                <div className="stock-logo-wrap">
+                  <StockLogo symbol={data.symbol} name={data.name} />
+                </div>
+              )}
+
+              {/* Col 2: Identity – name (row1), ticker+sector (row2) */}
+              <div className="stock-identity">
+                <span className="stock-name">{data.name || data.symbol}</span>
+                <div className="stock-meta">
+                  {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
+                  {data.sector && <span className="stock-sector">{data.sector}</span>}
                 </div>
               </div>
 
+              {/* Col 3: Price – EUR (row1), orig (row2), date (row3) */}
               {data.price != null && (
                 <div className="stock-price">
-                  <div className="price-value">
-                    {data.priceEur != null && data.currency !== 'EUR' ? (
-                      <>
-                        {/* Desktop: side by side with | */}
-                        <span className="price-desktop-only">
-                          <span className="price-orig">{Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}</span>
-                          <span className="price-sep">{' | '}</span>
-                          <span className="price-eur">{Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' €'}</span>
-                        </span>
-                        {/* Mobile: EUR on top, original below */}
-                        <span className="price-mobile-only">
-                          <span className="price-eur">{Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' €'}</span>
-                          <span className="price-orig-sub">{Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}</span>
-                        </span>
-                      </>
-                    ) : (
-                      <span className="price-eur">
-                        {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency ?? ''}
-                      </span>
-                    )}
+                  <div className="price-eur-main">
+                    {Number(data.priceEur ?? data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}€
                   </div>
-                  {data.priceDate ? (
-                    <div className="price-date">
-                      Stand: {new Date(data.priceDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}, {new Date(data.priceDate).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr
+                  {data.priceEur != null && data.currency !== 'EUR' && (
+                    <div className="price-orig-main">
+                      {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}
+                      <span className="price-sep-desktop">{' | '}
+                        {Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}€
+                      </span>
                     </div>
-                  ) : <div className="price-date">Aktueller Kurs</div>}
+                  )}
+                  <div className="price-date">
+                    {data.priceDate
+                      ? `Stand: ${new Date(data.priceDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}`
+                      : 'Aktueller Kurs'}
+                  </div>
                 </div>
               )}
+
             </div>
             <CompanyInfo data={data} />
           </div>
