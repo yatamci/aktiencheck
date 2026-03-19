@@ -603,27 +603,23 @@ body {
 .stock-name       { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Price col – rows align with identity rows */
-.stock-price      { text-align: right; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.stock-price { text-align: right; display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
 
-/* Row 1: EUR price – same visual weight as stock-name */
 .price-eur-main {
   font-family: 'DM Mono', monospace;
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-  line-height: 1.2;
+  font-size: 1.35rem; font-weight: 700; color: var(--text);
+  white-space: nowrap; line-height: 1.15;
 }
-
-/* Row 2: original currency – same size as stock-symbol badge */
 .price-orig-main {
   font-family: 'DM Mono', monospace;
-  font-size: 0.77rem;
-  font-weight: 500;
-  color: var(--text-3);
-  white-space: nowrap;
-  line-height: 1.2;
+  font-size: 0.77rem; font-weight: 400; color: var(--text-3);
+  white-space: nowrap; line-height: 1;
+  padding: 5px 0;
 }
+
+
+
+
 
 /* Desktop: show "USD | EUR" in row 2 instead of separate EUR row */
 .price-sep-desktop { display: none; }
@@ -689,22 +685,12 @@ body {
 }
 .stock-identity   { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .stock-name       { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stock-price      { display: flex; flex-direction: column; gap: 0; text-align: right; }
+.stock-price { text-align: right; display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
 
 /* EUR value: bold, prominent */
-.price-eur-main {
-  font-family: 'DM Mono', monospace;
-  font-size: 1.35rem; font-weight: 700; color: var(--text);
-  white-space: nowrap; line-height: 1;
-  margin-bottom: 5px;
-}
+
 /* Original currency (USD etc): light weight, muted */
-.price-orig-main {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.82rem; font-weight: 400; color: var(--text-3);
-  white-space: nowrap; line-height: 1;
-  margin-bottom: 5px;
-}
+
 .price-date {
   font-family: 'DM Mono', monospace;
   font-size: 0.68rem; color: var(--text-3);
@@ -713,7 +699,7 @@ body {
 .price-time-desktop { display: inline; }
 
 @media (min-width: 601px) {
-  .price-eur-main { font-size: 1.5rem; }
+  
 }
 @media (max-width: 600px) {
   .stock-header-top { gap: 10px; }
@@ -758,4 +744,18 @@ body {
   justify-content: center !important;
   font-size: 1.1rem !important;
   line-height: 1 !important;
+}
+
+/* ── Share button ── */
+.share-btn {
+  background: transparent; border: none; cursor: pointer;
+  font-size: 0.85rem; opacity: 0.4; padding: 2px 4px;
+  border-radius: 4px; transition: opacity 0.15s;
+  vertical-align: middle;
+}
+.share-btn:hover { opacity: 1; }
+
+/* ── Metric expand: ensure MiniChart is visible ── */
+.metric-expand--open .metric-expand-inner {
+  padding-bottom: 16px;
 }
