@@ -231,12 +231,13 @@ async function fromFinnhub(ticker:string,key:string):Promise<Partial<StockMetric
 }
 
 async function fromYahooFinance(ticker:string):Promise<Partial<StockMetrics>> {
-  // Yahoo uses 1810.HK, 005930.KS, 7203.T etc. directly - pass as-is
-  // For European stocks ending in .DE .PA etc - Yahoo also supports these
+  // Yahoo uses 1810.HK, 005930.KS, 7203.T etc. directly
+  // Add User-Agent to avoid 429 from Vercel IPs
+  const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
   const url2=`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=summaryDetail%2CdefaultKeyStatistics%2CfinancialData%2CassetProfile`
   const [chartRaw,summaryRaw]=await Promise.all([
-    get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`),
-    get(url2),
+    fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`,{headers,signal:AbortSignal.timeout(8000),cache:'no-store'}).then(r=>r.json()).catch(()=>null),
+    fetch(url2,{headers,signal:AbortSignal.timeout(8000),cache:'no-store'}).then(r=>r.json()).catch(()=>null),
   ])
   let hist:StockMetrics['hist']=[]
   try {
