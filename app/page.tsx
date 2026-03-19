@@ -1,23 +1,27 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import ThemeToggle from '../components/ThemeToggle'
-import MetricCard  from '../components/MetricCard'
-import SearchBar   from '../components/SearchBar'
-import MAChart     from '../components/MAChart'
+import ThemeToggle    from '../components/ThemeToggle'
+import LanguageToggle from '../components/LanguageToggle'
+import MetricCard     from '../components/MetricCard'
+import SearchBar      from '../components/SearchBar'
+import MAChart        from '../components/MAChart'
+import MiniChart      from '../components/MiniChart'
 import { StockData, buildMetrics, calculateOverallScore, MetricResult } from '../lib/evaluate'
+import { Lang, T, Translations } from '../lib/i18n'
 
-const LEFT_CATS = [
-  { title: 'Bewertung',    keys: ['pe','ps','pb'] },
-  { title: 'Rentabilität', keys: ['roe','roa','grossMargin','operatingMargin','netMargin'] },
+// ── Category definitions ───────────────────────────────────────────────────
+const LEFT_CATS  = [
+  { titleKey: 'Bewertung',    keys: ['pe','ps','pb'] },
+  { titleKey: 'Rentabilität', keys: ['roe','roa','grossMargin','operatingMargin','netMargin'] },
 ]
 const RIGHT_CATS = [
-  { title: 'Liquidität & Verschuldung', keys: ['cashflow','debt','currentRatio'] },
-  { title: 'Dividende & Wachstum',      keys: ['dividendYield','revenueGrowth','earningsGrowth'] },
-  { title: 'Technische Analyse',        keys: ['rsi'] },
+  { titleKey: 'Liquidität & Verschuldung', keys: ['cashflow','debt','currentRatio'] },
+  { titleKey: 'Dividende & Wachstum',      keys: ['dividendYield','revenueGrowth','earningsGrowth'] },
+  { titleKey: 'Technische Analyse',        keys: ['rsi'] },
 ]
 
-// ── Score Ring ────────────────────────────────────────────────────────────────
+// ── Score Ring ─────────────────────────────────────────────────────────────
 function ScoreRing({ pct, color }: { pct: number; color: string }) {
   const r = 72, circ = 2 * Math.PI * r
   const offset = circ * (1 - Math.min(1, Math.max(0, pct)))
@@ -38,47 +42,71 @@ function ScoreRing({ pct, color }: { pct: number; color: string }) {
   )
 }
 
-// ── Category Section ──────────────────────────────────────────────────────────
-function CategorySection({ title, metrics }: { title: string; metrics: MetricResult[] }) {
+// ── Category Section ───────────────────────────────────────────────────────
+function CategorySection({ title, metrics, lang, historicalMetrics }: {
+  title: string; metrics: MetricResult[]; lang: Lang
+  historicalMetrics?: StockData['historicalMetrics']
+}) {
   if (metrics.length === 0) return null
   return (
     <div className="category-section">
       <p className="section-title">{title}</p>
       <div className="metrics-col stagger">
-        {metrics.map(m => <MetricCard key={m.key} metric={m} />)}
+        {metrics.map(m => (
+          <MetricCard key={m.key} metric={m} lang={lang}
+            historicalData={historicalMetrics?.[m.key as keyof NonNullable<StockData['historicalMetrics']>]} />
+        ))}
       </div>
     </div>
   )
 }
 
-// ── Company Info ──────────────────────────────────────────────────────────────
-function CompanyInfo({ data }: { data: StockData }) {
+// ── Company Info ───────────────────────────────────────────────────────────
+function CompanyInfo({ data, t, lang }: { data: StockData; t: Translations; lang: Lang }) {
+  const [translated, setTranslated] = useState<string | null>(null)
+  const [translating, setTranslating] = useState(false)
+
   const facts = [
     data.sector    && `${data.sector}${data.industry ? ` · ${data.industry}` : ''}`,
     data.hq        && `📍 ${data.hq}`,
-    data.founded   && `🗓 Börsengang ${data.founded}`,
-    data.employees && `👥 ${data.employees} Mitarbeiter`,
-    data.ceo       && `👤 CEO: ${data.ceo}`,
+    data.founded   && `🗓 ${t.ipoLabel} ${data.founded}`,
+    data.employees && `👥 ${data.employees} ${t.employeesLabel}`,
+    data.ceo       && `👤 ${t.ceoLabel}: ${data.ceo}`,
   ].filter(Boolean) as string[]
 
-  // Build German Wikipedia URL from company name
-  const wikiName  = (data.name ?? '').replace(/\s+/g, '_').replace(/&/g, '%26')
-  const wikiUrl   = wikiName ? `https://de.wikipedia.org/wiki/${wikiName}` : null
+  const wikiName = (data.name ?? '').replace(/\s+/g, '_').replace(/&/g, '%26')
+  const wikiUrl  = wikiName ? `https://de.wikipedia.org/wiki/${wikiName}` : null
+
+  async function translateDesc() {
+    if (!data.description || translating) return
+    setTranslating(true)
+    try {
+      const target = lang === 'de' ? 'de' : 'en'
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(data.description)}`
+      const r   = await fetch(url)
+      const json = await r.json()
+      const text = (json[0] as [string,string,unknown,unknown][]).map(s => s[0]).join('')
+      setTranslated(text)
+    } catch { /* ignore */ }
+    finally { setTranslating(false) }
+  }
+
+  const desc = translated ?? data.description
 
   return (
     <div className="company-info">
-      {data.description && (
-        <p className="company-desc">
-          {data.description}
-          {wikiUrl && (
-            <> – <a
-              href={wikiUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="wiki-link"
-            >Wikipedia</a></>
+      {desc && (
+        <div>
+          <p className="company-desc">
+            {desc}
+            {wikiUrl && <> – <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="wiki-link">{t.wikiMore}</a></>}
+          </p>
+          {data.description && !translated && (
+            <button className="translate-btn" onClick={translateDesc} disabled={translating}>
+              {translating ? t.translating : `🌐 ${t.translate}`}
+            </button>
           )}
-        </p>
+        </div>
       )}
       {facts.length > 0 && (
         <div className="company-facts">
@@ -89,86 +117,52 @@ function CompanyInfo({ data }: { data: StockData }) {
   )
 }
 
-// ── Buy/Hold/Sell Recommendation ──────────────────────────────────────────────
-function getRecommendation(metrics: MetricResult[], crossSignal?: string): {
-  action: 'Kaufen' | 'Halten' | 'Verkaufen'; color: string; text: string
-} {
-  const score = (key: string) => metrics.find(m => m.key === key)?.score ?? 'neutral'
-  const val   = (key: string) => metrics.find(m => m.key === key)?.value ?? null
-  const goodCount = metrics.filter(m => m.score === 'good').length
-  const badCount  = metrics.filter(m => m.score === 'bad').length
-  const relevant  = metrics.filter(m => m.score !== 'neutral').length
-  const pct       = relevant > 0 ? (goodCount * 2 + metrics.filter(m => m.score === 'warn').length) / (relevant * 2) : 0
-  const bullish   = crossSignal === 'golden'
-  const bearish   = crossSignal === 'death'
-  const rsi       = val('rsi') as number | null
-  const oversold  = rsi != null && rsi < 35
-  const overbought= rsi != null && rsi > 65
-  const cheap     = score('pe') === 'good' && score('ps') === 'good'
-  const pricey    = score('pe') === 'bad'  || score('ps') === 'bad'
-  const profitable= score('roe') === 'good' || score('netMargin') === 'good'
-  const growing   = score('revenueGrowth') === 'good' || score('earningsGrowth') === 'good'
-
-  if (pct >= 0.65 && (bullish || !bearish) && !overbought) {
-    const reasons = [profitable && 'solide Profitabilität', growing && 'starkes Wachstum', cheap && 'günstige Bewertung', bullish && 'positiver Kurstrend', oversold && 'überverkauft'].filter(Boolean).slice(0,2).join(' und ')
-    return { action:'Kaufen', color:'var(--good)', text:`Starke Fundamentaldaten${reasons?' – '+reasons:''}. Aus Kennzahlenperspektive erscheint ein Einstieg attraktiv. Keine Anlageberatung – eigene Recherche empfohlen.` }
-  }
-  if (pct <= 0.3 || (bearish && badCount >= 3) || (overbought && pricey)) {
-    const reasons = [pricey && 'hohe Bewertung', bearish && 'negativer Kurstrend', overbought && 'technisch überkauft', badCount >= 3 && `${badCount} schwache Kennzahlen`].filter(Boolean).slice(0,2).join(' und ')
-    return { action:'Verkaufen', color:'var(--bad)', text:`Mehrere Warnsignale${reasons?' ('+reasons+')':''}. Eine Überprüfung der Position ist ratsam. Dies ist keine Anlageberatung.` }
-  }
-  return { action:'Halten', color:'var(--warn)', text:`Gemischtes Bild – Stärken und Schwächen halten sich die Waage.${bullish?' Aufwärtstrend positiv.':bearish?' Abwärtstrend beobachten.':''} Abwarten und Entwicklung verfolgen.` }
-}
-
-// ── Stock Logo ────────────────────────────────────────────────────────────────
+// ── Stock Logo ─────────────────────────────────────────────────────────────
 const TICKER_DOMAINS: Record<string,string> = {
-  AAPL:'apple.com', MSFT:'microsoft.com', GOOGL:'google.com', GOOG:'google.com',
-  AMZN:'amazon.com', TSLA:'tesla.com', META:'meta.com', NVDA:'nvidia.com',
-  NFLX:'netflix.com', INTC:'intel.com', AMD:'amd.com', ORCL:'oracle.com',
-  CRM:'salesforce.com', ADBE:'adobe.com', PYPL:'paypal.com', UBER:'uber.com',
-  ABNB:'airbnb.com', SPOT:'spotify.com', COIN:'coinbase.com', SHOP:'shopify.com',
-  SNAP:'snap.com', PINS:'pinterest.com', RBLX:'roblox.com', PLTR:'palantir.com',
-  NET:'cloudflare.com', DDOG:'datadoghq.com', CRWD:'crowdstrike.com',
-  OKTA:'okta.com', ZS:'zscaler.com', NOW:'servicenow.com', HUBS:'hubspot.com',
-  TEAM:'atlassian.com', TWLO:'twilio.com', MDB:'mongodb.com', SNOW:'snowflake.com',
-  JPM:'jpmorganchase.com', BAC:'bankofamerica.com', WFC:'wellsfargo.com',
-  GS:'goldmansachs.com', MS:'morganstanley.com', C:'citi.com', BLK:'blackrock.com',
-  V:'visa.com', MA:'mastercard.com', AXP:'americanexpress.com',
-  WMT:'walmart.com', TGT:'target.com', COST:'costco.com', HD:'homedepot.com',
-  MCD:'mcdonalds.com', SBUX:'starbucks.com', NKE:'nike.com', DIS:'disney.com',
-  CMCSA:'comcast.com', PG:'pg.com', KO:'coca-cola.com', PEP:'pepsico.com',
-  JNJ:'jnj.com', PFE:'pfizer.com', MRK:'merck.com', ABBV:'abbvie.com',
-  LLY:'lilly.com', AMGN:'amgen.com', GILD:'gilead.com', MRNA:'modernatx.com',
-  UNH:'unitedhealthgroup.com', CVS:'cvshealth.com',
-  XOM:'exxonmobil.com', CVX:'chevron.com', BA:'boeing.com',
-  CAT:'caterpillar.com', HON:'honeywell.com', UPS:'ups.com', FDX:'fedex.com',
-  SAP:'sap.com', ASML:'asml.com', TSM:'tsmc.com', TM:'toyota.com',
-  SONY:'sony.com', BABA:'alibaba.com', BIDU:'baidu.com', NIO:'nio.com',
-  RACE:'ferrari.com', NOK:'nokia.com', ERIC:'ericsson.com',
-  T:'att.com', VZ:'verizon.com', TMUS:'t-mobile.com',
-  '005930.KS':'samsung.com', '1810.HK':'mi.com', '0700.HK':'tencent.com',
-  '9988.HK':'alibaba.com', '7203.T':'toyota.com', '6758.T':'sony.com',
-  '9984.T':'softbank.jp', 'SMSN.L':'samsung.com',
-  EBAY:'ebay.com', ETSY:'etsy.com', W:'wayfair.com',
-  SBUX:'starbucks.com', CMG:'chipotle.com', YUM:'yum.com',
-  DAL:'delta.com', UAL:'united.com', AAL:'aa.com', MAR:'marriott.com',
-  HLT:'hilton.com', BKNG:'booking.com', EXPE:'expedia.com',
+  AAPL:'apple.com',MSFT:'microsoft.com',GOOGL:'google.com',GOOG:'google.com',
+  AMZN:'amazon.com',TSLA:'tesla.com',META:'meta.com',NVDA:'nvidia.com',
+  NFLX:'netflix.com',INTC:'intel.com',AMD:'amd.com',ORCL:'oracle.com',
+  CRM:'salesforce.com',ADBE:'adobe.com',PYPL:'paypal.com',UBER:'uber.com',
+  ABNB:'airbnb.com',SPOT:'spotify.com',COIN:'coinbase.com',SHOP:'shopify.com',
+  SNAP:'snap.com',PINS:'pinterest.com',NET:'cloudflare.com',DDOG:'datadoghq.com',
+  CRWD:'crowdstrike.com',OKTA:'okta.com',NOW:'servicenow.com',HUBS:'hubspot.com',
+  TEAM:'atlassian.com',TWLO:'twilio.com',MDB:'mongodb.com',SNOW:'snowflake.com',
+  JPM:'jpmorganchase.com',BAC:'bankofamerica.com',WFC:'wellsfargo.com',
+  GS:'goldmansachs.com',MS:'morganstanley.com',C:'citi.com',BLK:'blackrock.com',
+  V:'visa.com',MA:'mastercard.com',AXP:'americanexpress.com',
+  WMT:'walmart.com',TGT:'target.com',COST:'costco.com',HD:'homedepot.com',
+  MCD:'mcdonalds.com',SBUX:'starbucks.com',NKE:'nike.com',DIS:'disney.com',
+  KO:'coca-cola.com',PEP:'pepsico.com',PG:'pg.com',
+  JNJ:'jnj.com',PFE:'pfizer.com',MRK:'merck.com',ABBV:'abbvie.com',LLY:'lilly.com',
+  AMGN:'amgen.com',GILD:'gilead.com',MRNA:'modernatx.com',UNH:'unitedhealthgroup.com',
+  XOM:'exxonmobil.com',CVX:'chevron.com',BA:'boeing.com',CAT:'caterpillar.com',
+  HON:'honeywell.com',UPS:'ups.com',FDX:'fedex.com',
+  SAP:'sap.com',ASML:'asml.com',TSM:'tsmc.com',TM:'toyota.com',SONY:'sony.com',
+  BABA:'alibaba.com',BIDU:'baidu.com',NIO:'nio.com',RACE:'ferrari.com',
+  T:'att.com',VZ:'verizon.com',TMUS:'t-mobile.com',
+  EBAY:'ebay.com',ETSY:'etsy.com',
+  DAL:'delta.com',UAL:'united.com',MAR:'marriott.com',HLT:'hilton.com',BKNG:'booking.com',
+  '005930.KS':'samsung.com','1810.HK':'mi.com','0700.HK':'tencent.com',
+  '9988.HK':'alibaba.com','7203.T':'toyota.com','6758.T':'sony.com',
+  'SIE.DE':'siemens.com','ALV.DE':'allianz.com','BMW.DE':'bmw.com',
+  'MBG.DE':'mercedes-benz.com','VOW3.DE':'volkswagen.de','ADS.DE':'adidas.com',
+  'BAYN.DE':'bayer.com','DTE.DE':'telekom.com','SAP':'sap.com',
+  'MC.PA':'lvmh.com','OR.PA':'loreal.com','AIR.PA':'airbus.com',
 }
 
 function StockLogo({ symbol, name }: { symbol?: string; name?: string }) {
-  const [imgSrc, setImgSrc]   = useState<string | null>(null)
-  const [fallbackIdx, setFallbackIdx] = useState(0)
+  const [imgSrc, setImgSrc]     = useState<string|null>(null)
+  const [fallbackIdx, setFb]    = useState(0)
 
   const domain = symbol ? (
     TICKER_DOMAINS[symbol.toUpperCase()] ??
     TICKER_DOMAINS[symbol] ??
     (() => {
-      // Skip domain guessing for numeric/exchange tickers like 005930.KS
       if (/^\d/.test(symbol)) return null
       const base = (name ?? symbol)
         .toLowerCase()
-        .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i, '')
-        .trim().replace(/[^a-z0-9]/g, '').slice(0, 20)
+        .replace(/\s+(inc\.?|corp\.?|ltd\.?|plc|ag|se|n\.v\.|s\.a\.|gmbh|holdings?|group|limited|co\.|llc)\s*$/i,'')
+        .trim().replace(/[^a-z0-9]/g,'').slice(0,20)
       return base ? base + '.com' : null
     })()
   ) : null
@@ -176,35 +170,146 @@ function StockLogo({ symbol, name }: { symbol?: string; name?: string }) {
   const sources = domain ? [
     `https://logo.clearbit.com/${domain}`,
     `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
-    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
   ] : []
 
   useEffect(() => {
-    if (sources.length > 0) { setImgSrc(sources[0]); setFallbackIdx(0) }
+    if (sources.length > 0) { setImgSrc(sources[0]); setFb(0) }
   }, [symbol, name])
 
   if (!imgSrc || fallbackIdx >= sources.length) return null
-
   return (
-    <img
-      src={sources[fallbackIdx]}
-      alt=""
-      className="stock-logo"
-      onError={() => {
-        const next = fallbackIdx + 1
-        if (next < sources.length) { setFallbackIdx(next); setImgSrc(sources[next]) }
-        else setImgSrc(null)
-      }}
-    />
+    <img src={sources[fallbackIdx]} alt="" className="stock-logo"
+      onError={() => { const n=fallbackIdx+1; if(n<sources.length){setFb(n);setImgSrc(sources[n])}else setImgSrc(null) }} />
   )
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Price target estimation ────────────────────────────────────────────────
+function PriceTarget({ data, t, lang }: { data: StockData; t: Translations; lang: Lang }) {
+  const price     = data.price ?? 0
+  const priceEur  = data.priceEur ?? price
+  const currency  = data.currency ?? 'USD'
+
+  // DCF: simplified – use earnings growth + margin as proxy for intrinsic value
+  const eps        = price > 0 && data.pe && data.pe > 0 ? price / data.pe : null
+  const growthRate = data.earningsGrowth ?? data.revenueGrowth ?? 0.05
+  const discRate   = 0.09 // 9% discount rate
+  const termGrowth = 0.025
+  const dcfValue   = eps && eps > 0
+    ? (eps * (1 + growthRate) * (1 - Math.pow((1 + growthRate) / (1 + discRate), 10))) / (discRate - growthRate)
+      + (eps * Math.pow(1 + growthRate, 10) * (1 + termGrowth)) / ((discRate - termGrowth) * Math.pow(1 + discRate, 10))
+    : null
+
+  // Peter Lynch: fair P/E = growth rate × 100; fair value = EPS × fair P/E
+  const lynchPE    = growthRate > 0 ? Math.min(growthRate * 100, 50) : null
+  const lynchValue = eps && lynchPE ? eps * lynchPE : null
+
+  if (!dcfValue && !lynchValue) return null
+
+  const avg       = dcfValue && lynchValue ? (dcfValue + lynchValue) / 2 : dcfValue ?? lynchValue ?? 0
+  const pctDiff   = price > 0 ? ((avg - price) / price) * 100 : 0
+  const upside    = pctDiff > 0
+  const fmt       = (v: number) => Number(v).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })
+  const fmtEur    = (v: number) => {
+    if (currency === 'EUR' || !data.priceEur) return `${fmt(v)} ${currency}`
+    const rate = data.priceEur / (data.price ?? 1)
+    return `${fmt(v * rate)} € (${fmt(v)} ${currency})`
+  }
+
+  return (
+    <div className="glass-card price-target-card">
+      <p className="section-title" style={{ marginTop: 0 }}>{t.valuation}</p>
+      <div className="pt-grid">
+        {dcfValue && (
+          <div className="pt-model">
+            <span className="pt-label">{t.dcfModel}</span>
+            <span className="pt-value">{fmtEur(dcfValue)}</span>
+          </div>
+        )}
+        {lynchValue && (
+          <div className="pt-model">
+            <span className="pt-label">{t.lynchModel}</span>
+            <span className="pt-value">{fmtEur(lynchValue)}</span>
+          </div>
+        )}
+        <div className="pt-avg">
+          <span className="pt-label">{t.fairValueLabel}</span>
+          <span className="pt-avg-value" style={{ color: upside ? 'var(--good)' : 'var(--bad)' }}>
+            {fmtEur(avg)}
+            <span className="pt-diff"> ({upside ? '+' : ''}{pctDiff.toFixed(1)}%)</span>
+          </span>
+        </div>
+      </div>
+      <p className="pt-disclaimer">
+        {lang === 'de'
+          ? 'Vereinfachte Modellschätzung. Kein Ersatz für professionelle Analyse.'
+          : 'Simplified model estimate. Not a substitute for professional analysis.'}
+      </p>
+    </div>
+  )
+}
+
+// ── Recommendation ─────────────────────────────────────────────────────────
+function getRecommendation(metrics: MetricResult[], crossSignal: string|undefined, t: Translations) {
+  const score = (key: string) => metrics.find(m => m.key === key)?.score ?? 'neutral'
+  const val   = (key: string) => metrics.find(m => m.key === key)?.value ?? null
+  const good  = metrics.filter(m => m.score === 'good').length
+  const bad   = metrics.filter(m => m.score === 'bad').length
+  const rel   = metrics.filter(m => m.score !== 'neutral').length
+  const pct   = rel > 0 ? (good*2 + metrics.filter(m=>m.score==='warn').length) / (rel*2) : 0
+  const bull  = crossSignal === 'golden'
+  const bear  = crossSignal === 'death'
+  const rsi   = val('rsi') as number|null
+  const over  = rsi != null && rsi < 35
+  const overbought = rsi != null && rsi > 65
+  const cheap = score('pe')==='good' && score('ps')==='good'
+  const pricey= score('pe')==='bad'  || score('ps')==='bad'
+  const prof  = score('roe')==='good' || score('netMargin')==='good'
+  const grow  = score('revenueGrowth')==='good' || score('earningsGrowth')==='good'
+  if (pct >= 0.65 && (bull || !bear) && !overbought) {
+    const r = [prof&&(t as any).profitDesc, grow&&(t as any).growthDesc, cheap&&(t as any).cheapDesc, bull&&(t as any).bullDesc, over&&(t as any).oversoldDesc].filter(Boolean).slice(0,2).join(' & ')
+    const txt = `${lang==='de'?'Starke Fundamentaldaten':'Strong fundamentals'}${r?' – '+r:''}. ${lang==='de'?'Aus Kennzahlenperspektive erscheint ein Einstieg attraktiv.':'From a metrics perspective, entry looks attractive.'}`
+    return { action: t.buy, color: 'var(--good)', text: txt + (lang==='de'?' Keine Anlageberatung.':' Not investment advice.') }
+  }
+  if (pct <= 0.3 || (bear && bad >= 3) || (overbought && pricey)) {
+    const txt = lang==='de'?`Mehrere Warnsignale (${bad} schwache Kennzahlen${bear?', Abwärtstrend':''}). Überprüfung ratsam. Keine Anlageberatung.`
+      :`Multiple warning signs (${bad} weak metrics${bear?', downtrend':''}). Review recommended. Not investment advice.`
+    return { action: t.sell, color: 'var(--bad)', text: txt }
+  }
+  return {
+    action: t.hold, color: 'var(--warn)',
+    text: lang==='de'
+      ? `Gemischtes Bild.${bull?' Aufwärtstrend positiv.':bear?' Abwärtstrend beobachten.':''} Abwarten empfohlen.`
+      : `Mixed picture.${bull?' Uptrend positive.':bear?' Monitor downtrend.':''} Wait and observe recommended.`
+  }
+}
+
+// We need lang in getRecommendation – use a module-level variable
+let lang: Lang = 'de'
+
+// ── Main component ─────────────────────────────────────────────────────────
 export default function Home() {
-  const [data,    setData]    = useState<StockData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
-  const [rateLimited, setRateLimited] = useState(false)
+  const [data,         setData]         = useState<StockData | null>(null)
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
+  const [rateLimited,  setRateLimited]  = useState(false)
+  const [langState,    setLangState]    = useState<Lang>('de')
+
+  // Sync module-level lang
+  lang = langState
+
+  const t = T[langState]
+
+  // Language persistence
+  useEffect(() => {
+    const stored = localStorage.getItem('lang') as Lang | null
+    if (stored === 'en' || stored === 'de') setLangState(stored)
+  }, [])
+
+  function toggleLang() {
+    const next: Lang = langState === 'de' ? 'en' : 'de'
+    setLangState(next)
+    localStorage.setItem('lang', next)
+  }
 
   const search = useCallback(async (symbol: string) => {
     setLoading(true); setError(null); setData(null); setRateLimited(false)
@@ -214,9 +319,9 @@ export default function Home() {
       if (json.rateLimited) setRateLimited(true)
       else if (json.error)  setError(json.error)
       else                  setData(json)
-    } catch { setError('Netzwerkfehler.') }
+    } catch { setError(langState === 'de' ? 'Netzwerkfehler.' : 'Network error.') }
     finally   { setLoading(false) }
-  }, [])
+  }, [langState])
 
   const metrics    = data ? buildMetrics(data) : []
   const metricsMap = Object.fromEntries(metrics.map(m => [m.key, m]))
@@ -225,7 +330,7 @@ export default function Home() {
   const warnCount  = metrics.filter(m => m.score === 'warn').length
   const badCount   = metrics.filter(m => m.score === 'bad').length
 
-  // Dynamically align RSI bottom with Nettomarge bottom
+  // RSI alignment
   useEffect(() => {
     if (!data) return
     const align = () => {
@@ -234,25 +339,13 @@ export default function Home() {
       const rsiEl   = document.querySelector('[data-key="rsi"]') as HTMLElement
       const spacer  = document.querySelector('.rsi-spacer') as HTMLElement
       if (!nettoEl || !rsiEl || !spacer) return
-      // Reset spacer first for accurate measurement
-      spacer.style.flexGrow = '0'
-      spacer.style.height   = '0px'
-      // After reset, measure
+      spacer.style.flexGrow = '0'; spacer.style.height = '0px'
       requestAnimationFrame(() => {
-        const nettoRect = nettoEl.getBoundingClientRect()
-        const rsiRect   = rsiEl.getBoundingClientRect()
-        // We want bottom of RSI = bottom of Nettomarge
-        const needed = (nettoRect.bottom - rsiRect.bottom)
-        if (needed !== 0) {
-          spacer.style.height = Math.max(0, needed) + 'px'
-        }
+        const diff = nettoEl.getBoundingClientRect().bottom - rsiEl.getBoundingClientRect().bottom
+        if (diff !== 0) spacer.style.height = Math.max(0, diff) + 'px'
       })
     }
-    const timers = [
-      setTimeout(align, 50),
-      setTimeout(align, 200),
-      setTimeout(align, 500),
-    ]
+    const timers = [50,200,500].map(d => setTimeout(align, d))
     window.addEventListener('resize', align)
     return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', align) }
   }, [data, metrics])
@@ -262,35 +355,38 @@ export default function Home() {
       <header className="header">
         <div className="logo">
           <div className="logo-icon">📈</div>
-          <h1 className="logo-text">Aktien<span>check</span></h1>
+          <h1 className="logo-text">{langState === 'de' ? <>Aktien<span>check</span></> : <>Stock<span>check</span></>}</h1>
         </div>
-        <ThemeToggle />
+        <div style={{ display:'flex', gap:'8px' }}>
+          <LanguageToggle lang={langState} onToggle={toggleLang} />
+          <ThemeToggle />
+        </div>
       </header>
 
-      <SearchBar onSearch={search} loading={loading} />
+      <SearchBar onSearch={search} loading={loading} placeholder={t.searchPlaceholder} analyzeLabel={t.analyze} />
 
       {loading && (
         <div className="loading-wrapper fade-in">
-          <div className="spinner" /><p className="loading-text">Finanzdaten werden geladen …</p>
+          <div className="spinner" /><p className="loading-text">{t.loading}</p>
         </div>
       )}
       {rateLimited && !loading && (
         <div className="glass-card error-card fade-in">
-          <p className="error-title">⏳ Tageslimit erreicht</p>
-          <p className="error-msg">Das tägliche Abfragelimit ist ausgeschöpft. Bitte morgen erneut versuchen.</p>
+          <p className="error-title">{t.rateLimitTitle}</p>
+          <p className="error-msg">{t.rateLimitMsg}</p>
         </div>
       )}
       {error && !loading && !rateLimited && (
         <div className="glass-card error-card fade-in">
-          <p className="error-title">❌ Fehler</p>
+          <p className="error-title">{t.errorTitle}</p>
           <p className="error-msg">{error}</p>
         </div>
       )}
       {!data && !loading && !error && !rateLimited && (
         <div className="empty-state fade-in">
           <div className="empty-icon">🔍</div>
-          <p className="empty-title">Aktie suchen und analysieren</p>
-          <p className="empty-subtitle">Gib den Namen oder das Ticker-Symbol ein – z.&nbsp;B. Apple, AAPL, Tesla, Xiaomi, SAP …</p>
+          <p className="empty-title">{t.emptyTitle}</p>
+          <p className="empty-subtitle">{t.emptySubtitle}</p>
         </div>
       )}
 
@@ -300,15 +396,7 @@ export default function Home() {
           {/* ── Stock Header ── */}
           <div className="glass-card stock-header">
             <div className="stock-header-top">
-
-              {/* Col 1: Logo */}
-              {data.symbol && (
-                <div className="stock-logo-wrap">
-                  <StockLogo symbol={data.symbol} name={data.name} />
-                </div>
-              )}
-
-              {/* Col 2: Identity – name (row1), ticker+sector (row2) */}
+              {data.symbol && <div className="stock-logo-wrap"><StockLogo symbol={data.symbol} name={data.name} /></div>}
               <div className="stock-identity">
                 <span className="stock-name">{data.name || data.symbol}</span>
                 <div className="stock-meta">
@@ -316,54 +404,56 @@ export default function Home() {
                   {data.sector && <span className="stock-sector">{data.sector}</span>}
                 </div>
               </div>
-
-              {/* Col 3: Price – EUR (row1), orig (row2), date (row3) */}
               {data.price != null && (
                 <div className="stock-price">
                   <div className="price-eur-main">
-                    {Number(data.priceEur ?? data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}€
+                    {Number(data.priceEur ?? data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}€
                   </div>
                   {data.priceEur != null && data.currency !== 'EUR' && (
                     <div className="price-orig-main">
-                      {Number(data.price).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}{data.currency}
-                      <span className="price-sep-desktop">{' | '}
-                        {Number(data.priceEur).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })}{' '}€
-                      </span>
+                      {Number(data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}{data.currency}
+                      <span className="price-sep-desktop">{'\u00a0|\u00a0'}{Number(data.priceEur).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}€</span>
                     </div>
                   )}
                   <div className="price-date">
-                    {data.priceDate
-                      ? `Stand: ${new Date(data.priceDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}`
-                      : 'Aktueller Kurs'}
+                    {data.priceDate ? (
+                      <>
+                        {t.standPrefix}{' '}
+                        {new Date(data.priceDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}
+                        <span className="price-time-desktop">, {new Date(data.priceDate).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr</span>
+                      </>
+                    ) : t.currentPrice}
                   </div>
                 </div>
               )}
-
             </div>
-            <CompanyInfo data={data} />
+            <CompanyInfo data={data} t={t} lang={langState} />
           </div>
 
           {/* Legend */}
           <div className="legend">
-            <div className="legend-item"><div className="legend-dot" style={{background:'var(--good)'}}/>Gut</div>
-            <div className="legend-item"><div className="legend-dot" style={{background:'var(--warn)'}}/>Aufpassen</div>
-            <div className="legend-item"><div className="legend-dot" style={{background:'var(--bad)'}} />Schlecht</div>
-            <div className="legend-item"><div className="legend-dot" style={{background:'var(--neutral)'}}/>Keine Daten</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--good)'}}/>{ t.legend.good}</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--warn)'}}/>{ t.legend.warn}</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--bad)'}} />{ t.legend.bad}</div>
+            <div className="legend-item"><div className="legend-dot" style={{background:'var(--neutral)'}}/>{ t.legend.neutral}</div>
           </div>
 
           {/* ── Metrics grid ── */}
           <div className="metrics-grid">
             <div className="grid-col">
               {LEFT_CATS.map(cat => (
-                <CategorySection key={cat.title} title={cat.title}
-                  metrics={cat.keys.map(k => metricsMap[k]).filter(Boolean)} />
+                <CategorySection key={cat.titleKey} title={t.cats[cat.titleKey as keyof typeof t.cats] ?? cat.titleKey}
+                  metrics={cat.keys.map(k=>metricsMap[k]).filter(Boolean)} lang={langState}
+                  historicalMetrics={data.historicalMetrics} />
               ))}
             </div>
             <div className="grid-col">
-              {RIGHT_CATS.map((cat) => (
-                <CategorySection key={cat.title} title={cat.title}
-                  metrics={cat.keys.map(k => metricsMap[k]).filter(Boolean)} />
+              {RIGHT_CATS.map(cat => (
+                <CategorySection key={cat.titleKey} title={t.cats[cat.titleKey as keyof typeof t.cats] ?? cat.titleKey}
+                  metrics={cat.keys.map(k=>metricsMap[k]).filter(Boolean)} lang={langState}
+                  historicalMetrics={data.historicalMetrics} />
               ))}
+              <div className="rsi-spacer" />
             </div>
           </div>
 
@@ -371,7 +461,7 @@ export default function Home() {
           <div className="bottom-grid">
             {data.chartData && data.chartData.length > 0 && (
               <div>
-                <p className="section-title">Trendanalyse</p>
+                <p className="section-title">{t.trend}</p>
                 <MAChart data={data.chartData} crossSignal={data.crossSignal??'none'}
                   ma50Latest={data.ma50Latest??null} ma200Latest={data.ma200Latest??null}
                   currency={data.currency??'USD'} />
@@ -379,30 +469,28 @@ export default function Home() {
             )}
             {overall && (
               <div>
-                <p className="section-title">Gesamtbewertung</p>
+                <p className="section-title">{t.overall}</p>
                 <div className="glass-card overall-card">
-                  {/* Top: label + ring side by side */}
                   <div className="overall-top">
                     <div className="overall-left">
-                      <h3>Aktiencheck-Score</h3>
+                      <h3>{t.scoreTitle}</h3>
                       <div className="overall-label" style={{color:overall.color}}>{overall.label}</div>
                       <div className="score-breakdown">
-                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--good)'}}/>{goodCount} Kriterien gut</div>
-                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--warn)'}}/>{warnCount} im Grenzbereich</div>
-                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--bad)'}} />{badCount} Kriterien schlecht</div>
+                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--good)'}}/>{goodCount} {t.criteriaGood}</div>
+                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--warn)'}}/>{warnCount} {t.criteriaMid}</div>
+                        <div className="score-breakdown-row"><div className="breakdown-dot" style={{background:'var(--bad)'}} />{badCount} {t.criteriaBad}</div>
                       </div>
                     </div>
                     <div className="overall-right">
-                      <ScoreRing pct={overall.maxScore > 0 ? overall.score/overall.maxScore : 0} color={overall.color} />
+                      <ScoreRing pct={overall.maxScore>0?overall.score/overall.maxScore:0} color={overall.color} />
                     </div>
                   </div>
-                  {/* Bottom: recommendation */}
                   {(() => {
-                    const rec = getRecommendation(metrics, data?.crossSignal)
+                    const rec = getRecommendation(metrics, data?.crossSignal, t)
                     return (
                       <div className="recommendation">
                         <div className="rec-action" style={{color:rec.color}}>
-                          {rec.action==='Kaufen'?'↑':rec.action==='Verkaufen'?'↓':'→'} {rec.action}
+                          {rec.action===t.buy?'↑':rec.action===t.sell?'↓':'→'} {rec.action}
                         </div>
                         <p className="rec-text">{rec.text}</p>
                       </div>
@@ -413,18 +501,17 @@ export default function Home() {
             )}
           </div>
 
+          {/* ── Price target ── */}
+          <PriceTarget data={data} t={t} lang={langState} />
+
         </div>
       )}
 
       <footer className="footer">
-        <strong>⚠️ Risikohinweis &amp; Haftungsausschluss:</strong> Diese Analyse wird vollautomatisch
-        erstellt und dient ausschließlich zu Informationszwecken. KI-basierte Systeme können Fehler
-        machen – alle Angaben ohne Gewähr. <strong>Dies ist keine Anlageberatung.</strong> Jede
-        Investitionsentscheidung liegt in der alleinigen Verantwortung des Nutzers. Vergangene
-        Wertentwicklungen sind kein Indikator für zukünftige Ergebnisse. Bitte konsultiere einen
-        zugelassenen Finanzberater. Datenquelle: Financial Modeling Prep, Yahoo Finance, Alpha Vantage, Finnhub.
+        <strong>{t.disclaimer}</strong>{' '}
+        {t.disclaimerText}{' '}
+        <span style={{opacity:0.7}}>Sources: FMP, Yahoo Finance, Alpha Vantage, Finnhub, Stooq.</span>
       </footer>
-
     </main>
   )
 }
