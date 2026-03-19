@@ -1,4 +1,5 @@
-export type Lang = 'de' | 'en'
+export type { Lang } from './evaluate'
+import type { Lang } from './evaluate'
 
 export const T = {
   de: {
