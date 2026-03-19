@@ -63,8 +63,30 @@ function CategorySection({ title, metrics, lang, historicalMetrics }: {
 
 // ── Company Info ───────────────────────────────────────────────────────────
 function CompanyInfo({ data, t, lang }: { data: StockData; t: Translations; lang: Lang }) {
-  const [translated, setTranslated] = useState<string | null>(null)
-  const [translating, setTranslating] = useState(false)
+  const [translated, setTranslated] = useState<Record<string,string>>({})
+
+  // Auto-translate whenever lang changes
+  useEffect(() => {
+    if (!data.description) return
+    if (translated[lang]) return // already have it
+    // English description is original – no need to translate to 'en'
+    const isEnglishOrig = true // FMP always returns English
+    if (lang === 'en' && isEnglishOrig) return
+    let cancelled = false
+    async function run() {
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${lang}&dt=t&q=${encodeURIComponent(data.description!)}`
+        const r   = await fetch(url)
+        const json = await r.json()
+        const text = (json[0] as [string,string,unknown,unknown][]).map(s => s[0]).join('')
+        if (!cancelled) setTranslated(prev => ({ ...prev, [lang]: text }))
+      } catch { /* ignore */ }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [lang, data.description])
+
+  const desc = (lang === 'en' ? data.description : translated[lang]) ?? data.description
 
   const facts = [
     data.sector    && `${data.sector}${data.industry ? ` · ${data.industry}` : ''}`,
@@ -77,36 +99,13 @@ function CompanyInfo({ data, t, lang }: { data: StockData; t: Translations; lang
   const wikiName = (data.name ?? '').replace(/\s+/g, '_').replace(/&/g, '%26')
   const wikiUrl  = wikiName ? `https://de.wikipedia.org/wiki/${wikiName}` : null
 
-  async function translateDesc() {
-    if (!data.description || translating) return
-    setTranslating(true)
-    try {
-      const target = lang === 'de' ? 'de' : 'en'
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(data.description)}`
-      const r   = await fetch(url)
-      const json = await r.json()
-      const text = (json[0] as [string,string,unknown,unknown][]).map(s => s[0]).join('')
-      setTranslated(text)
-    } catch { /* ignore */ }
-    finally { setTranslating(false) }
-  }
-
-  const desc = translated ?? data.description
-
   return (
     <div className="company-info">
       {desc && (
-        <div>
-          <p className="company-desc">
-            {desc}
-            {wikiUrl && <> – <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="wiki-link">{t.wikiMore}</a></>}
-          </p>
-          {data.description && !translated && (
-            <button className="translate-btn" onClick={translateDesc} disabled={translating}>
-              {translating ? t.translating : `🌐 ${t.translate}`}
-            </button>
-          )}
-        </div>
+        <p className="company-desc">
+          {desc}
+          {wikiUrl && <> – <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="wiki-link">{t.wikiMore}</a></>}
+        </p>
       )}
       {facts.length > 0 && (
         <div className="company-facts">
@@ -215,28 +214,46 @@ function PriceTarget({ data, t, lang }: { data: StockData; t: Translations; lang
     return `${fmt(v * rate)} € (${fmt(v)} ${currency})`
   }
 
+  // Format: EUR value bold, USD value light, % on own line
+  const fmtRow = (v: number) => {
+    const eurVal = currency === 'EUR' || !data.priceEur ? v : v * (data.priceEur / (data.price ?? 1))
+    const origVal = currency !== 'EUR' && data.priceEur ? v : null
+    return { eur: fmt(eurVal), orig: origVal ? fmt(v) : null }
+  }
+  const dcfRow   = dcfValue   ? fmtRow(dcfValue)   : null
+  const lynchRow = lynchValue ? fmtRow(lynchValue)  : null
+  const avgRow   = fmtRow(avg)
+
   return (
     <div className="glass-card price-target-card">
-      <p className="section-title" style={{ marginTop: 0 }}>{t.valuation}</p>
       <div className="pt-grid">
-        {dcfValue && (
-          <div className="pt-model">
+        {/* Header row */}
+        <div className="pt-header-row">
+          <span className="pt-col-label">{lang === 'de' ? 'Modell' : 'Model'}</span>
+          {dcfRow?.orig && <span className="pt-col-header">{currency}</span>}
+          <span className="pt-col-header">EUR</span>
+        </div>
+        {dcfRow && (
+          <div className="pt-row">
             <span className="pt-label">{t.dcfModel}</span>
-            <span className="pt-value">{fmtEur(dcfValue)}</span>
+            {dcfRow.orig && <span className="pt-val-orig">{dcfRow.orig}</span>}
+            <span className="pt-val-eur">{dcfRow.eur} €</span>
           </div>
         )}
-        {lynchValue && (
-          <div className="pt-model">
+        {lynchRow && (
+          <div className="pt-row">
             <span className="pt-label">{t.lynchModel}</span>
-            <span className="pt-value">{fmtEur(lynchValue)}</span>
+            {lynchRow.orig && <span className="pt-val-orig">{lynchRow.orig}</span>}
+            <span className="pt-val-eur">{lynchRow.eur} €</span>
           </div>
         )}
-        <div className="pt-avg">
-          <span className="pt-label">{t.fairValueLabel}</span>
-          <span className="pt-avg-value" style={{ color: upside ? 'var(--good)' : 'var(--bad)' }}>
-            {fmtEur(avg)}
-            <span className="pt-diff"> ({upside ? '+' : ''}{pctDiff.toFixed(1)}%)</span>
-          </span>
+        <div className="pt-row pt-avg-row">
+          <span className="pt-label pt-label-bold">{t.fairValueLabel}</span>
+          {avgRow.orig && <span className="pt-val-orig">{avgRow.orig}</span>}
+          <div className="pt-val-eur-wrap">
+            <span className="pt-val-eur pt-val-eur-bold" style={{ color: upside ? 'var(--good)' : 'var(--bad)' }}>{avgRow.eur} €</span>
+            <span className="pt-pct" style={{ color: upside ? 'var(--good)' : 'var(--bad)' }}>{upside ? '+' : ''}{pctDiff.toFixed(1)} %</span>
+          </div>
         </div>
       </div>
       <p className="pt-disclaimer">
@@ -406,13 +423,21 @@ export default function Home() {
               </div>
               {data.price != null && (
                 <div className="stock-price">
-                  <div className="price-eur-main">
-                    {Number(data.priceEur ?? data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}€
-                  </div>
-                  {data.priceEur != null && data.currency !== 'EUR' && (
-                    <div className="price-orig-main">
-                      {Number(data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}{data.currency}
-                      <span className="price-sep-desktop">{'\u00a0|\u00a0'}{Number(data.priceEur).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}€</span>
+                  {/* Row 1: Desktop = USD | EUR  /  Mobile = EUR bold */}
+                  {data.priceEur != null && data.currency !== 'EUR' ? (
+                    <>
+                      {/* Desktop row 1: orig USD */}
+                      <div className="price-orig-main price-desktop-row1">
+                        {Number(data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}{data.currency}
+                      </div>
+                      {/* Desktop row 2: EUR */}
+                      <div className="price-eur-main price-desktop-row2">
+                        {Number(data.priceEur).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}€
+                      </div>
+                    </>
+                  ) : (
+                    <div className="price-eur-main">
+                      {Number(data.priceEur ?? data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}{data.currency ?? '€'}
                     </div>
                   )}
                   <div className="price-date">
@@ -502,7 +527,10 @@ export default function Home() {
           </div>
 
           {/* ── Price target ── */}
-          <PriceTarget data={data} t={t} lang={langState} />
+          <div className="pt-outer">
+            <p className="section-title">{t.valuation}</p>
+            <PriceTarget data={data} t={t} lang={langState} />
+          </div>
 
         </div>
       )}
