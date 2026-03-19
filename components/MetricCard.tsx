@@ -65,8 +65,8 @@ export default function MetricCard({ metric, lang, historicalData }: { metric: M
         <div className="metric-left">
           <ScoreBadge score={metric.score} />
           <div className="metric-info">
-            <span className="metric-label">{metric.label}</span>
-            <span className="metric-description">{metric.description}</span>
+            <span className="metric-label">{lang === 'en' ? metric.labelEn : metric.label}</span>
+            <span className="metric-description">{lang === 'en' ? metric.descriptionEn : metric.description}</span>
           </div>
         </div>
         <div className="metric-right">
@@ -84,29 +84,29 @@ export default function MetricCard({ metric, lang, historicalData }: { metric: M
         <div className="metric-expand-inner">
 
           <div className="metric-detail-interp">
-            <span className="metric-detail-label">Einordnung</span>
-            <span className="metric-detail-value">{metric.interpretation}</span>
+            <span className="metric-detail-label">{lang === 'en' ? 'Interpretation' : 'Einordnung'}</span>
+            <span className="metric-detail-value">{lang === 'en' ? metric.interpretationEn : metric.interpretation}</span>
           </div>
 
           <div className="metric-detail-formula">
-            <span className="metric-detail-label">Berechnung</span>
-            <span className="metric-detail-value">{metric.formula}</span>
+            <span className="metric-detail-label">{lang === 'en' ? 'Formula' : 'Berechnung'}</span>
+            <span className="metric-detail-value">{lang === 'en' ? metric.formulaEn : metric.formula}</span>
           </div>
 
           <div className="metric-detail-thresholds">
-            <span className="metric-detail-label">Bewertung</span>
+            <span className="metric-detail-label">{lang === 'en' ? 'Rating' : 'Bewertung'}</span>
             <div className="metric-threshold-rows">
               <div className="metric-threshold-row">
                 <span className="threshold-badge threshold-good">✓</span>
-                <span>{metric.thresholds.good}</span>
+                <span>{lang === 'en' ? metric.thresholdsEn.good : metric.thresholds.good}</span>
               </div>
               <div className="metric-threshold-row">
                 <span className="threshold-badge threshold-warn">!</span>
-                <span>{metric.thresholds.warn}</span>
+                <span>{lang === 'en' ? metric.thresholdsEn.warn : metric.thresholds.warn}</span>
               </div>
               <div className="metric-threshold-row">
                 <span className="threshold-badge threshold-bad">✕</span>
-                <span>{metric.thresholds.bad}</span>
+                <span>{lang === 'en' ? metric.thresholdsEn.bad : metric.thresholds.bad}</span>
               </div>
             </div>
           </div>
