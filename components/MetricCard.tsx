@@ -51,6 +51,7 @@ export default function MetricCard({ metric }: { metric: MetricResult }) {
   return (
     <div
       className={`metric-card${open ? ' metric-card--open' : ''}`}
+      data-key={metric.key}
       onClick={() => setOpen(o => !o)}
       role="button"
       aria-expanded={open}
