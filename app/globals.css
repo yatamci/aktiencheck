@@ -660,3 +660,32 @@ body {
   .stock-name       { font-size: 1.05rem; }
   .price-eur-main   { font-size: 1.05rem; }
 }
+
+/* ── Price time: show on desktop, hide on mobile ── */
+.price-time-desktop { display: inline; }
+@media (max-width: 600px) {
+  .price-time-desktop { display: none; }
+  .price-date { display: block; }
+}
+
+/* ── Price target card ── */
+.price-target-card { padding: 20px 22px; margin-top: 16px; }
+.pt-grid     { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 10px; }
+.pt-model    { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pt-avg      { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.pt-label    { font-size: 0.78rem; color: var(--text-2); }
+.pt-value    { font-family: 'DM Mono', monospace; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.pt-avg-value{ font-family: 'DM Mono', monospace; font-size: 1rem; font-weight: 700; }
+.pt-diff     { font-size: 0.78rem; font-weight: 500; }
+.pt-disclaimer { font-size: 0.68rem; color: var(--text-3); font-style: italic; }
+
+/* ── Translate button ── */
+.translate-btn {
+  margin-top: 6px;
+  background: var(--accent-bg); color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 6px;
+  padding: 3px 10px; font-size: 0.72rem; font-family: inherit;
+  cursor: pointer; transition: all 0.15s;
+}
+.translate-btn:hover { background: var(--accent); color: #fff; }
+.translate-btn:disabled { opacity: 0.5; cursor: wait; }
