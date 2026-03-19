@@ -361,6 +361,41 @@ export async function GET(req:NextRequest) {
     const d=await fromFinnhub(ticker,fhKey)
     if(Object.values(d).some(v=>v!=null)){result=merge(result,d);_sources.push('Finnhub')}
   }
+  // Fetch Yahoo Finance annual timeseries for historical metrics if FMP didn't provide them
+  if (!result.historicalRatios || result.historicalRatios.length === 0) {
+    try {
+      const types = 'annualPeRatio,annualPriceToBook,annualPriceToSales,annualRevenueGrowth,annualNetIncomeMargin,annualReturnOnEquity'
+      const tsUrl = `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(ticker)}?type=${types}&period1=1104537600&period2=9999999999`
+      const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      const tsRaw = await fetch(tsUrl, { headers, signal: AbortSignal.timeout(5000), cache: 'no-store' }).then(r=>r.json()).catch(()=>null)
+      const tsResult = (tsRaw as Record<string,unknown>)?.timeseries?.result as Record<string,unknown>[] | undefined
+      if (tsResult && tsResult.length > 0) {
+        // Convert Yahoo timeseries to our format
+        const yahooHist: Record<string,unknown>[] = []
+        const typeMap: Record<string,string> = {
+          annualPeRatio: 'peRatio', annualPriceToBook: 'priceToBookRatio',
+          annualPriceToSales: 'priceToSalesRatio', annualRevenueGrowth: 'revenueGrowth',
+          annualNetIncomeMargin: 'netProfitMargin', annualReturnOnEquity: 'returnOnEquity',
+        }
+        const dateMap: Record<string,Record<string,unknown>> = {}
+        for (const series of tsResult) {
+          const typeName = String(series.meta ? (series.meta as Record<string,unknown>).type?.[0] ?? '' : '')
+          const fieldName = typeMap[typeName]
+          if (!fieldName) continue
+          const dataPoints = (series[typeName] as Record<string,unknown>[]) ?? []
+          for (const pt of dataPoints) {
+            const date = String(pt.asOfDate ?? '').slice(0,4)
+            if (!date) continue
+            if (!dateMap[date]) dateMap[date] = { date }
+            dateMap[date][fieldName] = (pt.reportedValue as Record<string,unknown>)?.raw ?? pt.reportedValue
+          }
+        }
+        result.historicalRatios = Object.values(dateMap).sort((a,b)=>String(a.date).localeCompare(String(b.date)))
+        _sources.push('YahooTimeseries')
+      }
+    } catch { /* ignore */ }
+  }
+
   if(!isFull(result)&&tdKey){
     const d=await fromTwelveData(ticker,tdKey)
     if(Object.values(d).some(v=>v!=null)){result=merge(result,d);_sources.push('TwelveData')}
@@ -437,7 +472,10 @@ export async function GET(req:NextRequest) {
     cashflow:result.cashflow,debt:result.debt,currentRatio:result.currentRatio,
     rsi:result.rsi,dividendYield:result.dividendYield,
     revenueGrowth:result.revenueGrowth,earningsGrowth:result.earningsGrowth,
-    chartData,crossSignal,ma50Latest:ma50L,ma200Latest:ma200L,_sources,
+    chartData,crossSignal,ma50Latest:ma50L,ma200Latest:ma200L,
+    _sources:[..._sources, `histRatios:${result.historicalRatios?.length??0}`],
+    // If FMP historical is empty, try Yahoo Finance timeseries
+    ...(result.historicalRatios?.length === 0 ? { _noHistFromFMP: true } : {}),
     historicalMetrics: (() => {
       const rows = result.historicalRatios ?? []
       const mapRow = (key: string) => rows
