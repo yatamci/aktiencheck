@@ -156,7 +156,7 @@ async function fromFMP(ticker:string,key:string):Promise<Partial<StockMetrics>> 
     get(`https://financialmodelingprep.com/stable/financial-growth?symbol=${ticker}&limit=1&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/technical-indicator/daily?symbol=${ticker}&type=rsi&period=14&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${ticker}&limit=1300&apikey=${key}`),
-    get(`https://financialmodelingprep.com/stable/ratios/${ticker}?limit=10&apikey=${key}`),
+    get(`https://financialmodelingprep.com/stable/ratios?symbol=${ticker}&limit=10&apikey=${key}`),
   ])
   if(isLimited(pR)) return {}
   const p=first(pR),r=first(rR),m=first(mR),g=first(gR)
