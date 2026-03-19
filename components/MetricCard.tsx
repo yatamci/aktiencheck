@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { MetricResult, Score } from '../lib/evaluate'
+import MiniChart from './MiniChart'
+import type { Lang } from '../lib/i18n'
 
 function formatValue(value: number | null | undefined, type?: string): string {
   if (value == null) return '–'
@@ -44,7 +46,7 @@ function ScoreBadge({ score }: { score: Score }) {
   )
 }
 
-export default function MetricCard({ metric }: { metric: MetricResult }) {
+export default function MetricCard({ metric, lang, historicalData }: { metric: MetricResult; lang?: Lang; historicalData?: {date:string;value:number}[] }) {
   const [open, setOpen] = useState(false)
   const formattedValue  = formatValue(metric.value, metric.formatType)
 
@@ -108,6 +110,15 @@ export default function MetricCard({ metric }: { metric: MetricResult }) {
               </div>
             </div>
           </div>
+
+          {historicalData && historicalData.length >= 2 && (
+            <MiniChart
+              data={historicalData}
+              color="var(--accent)"
+              label={lang === 'en' ? 'Historical (annual)' : 'Historisch (jährlich)'}
+              formatValue={(v) => metric.formatType === 'percent' ? (v*100).toFixed(1)+'%' : metric.formatType === 'ratio' ? v.toFixed(2) : v.toFixed(1)}
+            />
+          )}
 
         </div>
       </div>
