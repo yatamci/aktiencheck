@@ -110,6 +110,79 @@ const NAME_MAP:Record<string,string> = {
   'ferrari':'RACE','ericsson':'ERIC','nokia':'NOK',
   'eni':'ENI.MI','enel':'ENEL.MI','intesa':'ISP.MI','unicredit':'UCG.MI',
   'iberdrola':'IBE.MC','santander':'SAN.MC','inditex':'ITX.MC','zara':'ITX.MC',
+  // Asian additions
+  'huawei':'0941.HK', // Note: Huawei is private, China Mobile as proxy
+  'netease':'9999.HK','net ease':'9999.HK',
+  'geely':'0175.HK','hkex':'0388.HK','hong kong exchange':'0388.HK',
+  'aia':'1299.HK','ping an':'2318.HK','icbc':'1398.HK',
+  'ccb':'0939.HK','byd':'1211.HK','byd electronic':'0285.HK',
+  'li auto':'LI','xpeng':'XPEV','kuaishou':'1024.HK',
+  'kingsoft':'3888.HK','anta':'2020.HK','haidilao':'6862.HK',
+  'sk hynix':'000660.KS','hynix':'000660.KS','lg chem':'051910.KS',
+  'hyundai':'005380.KS','naver':'035420.KS','kakao':'035720.KS',
+  'samsung sdi':'006400.KS','kia':'000270.KS',
+  'hitachi':'6501.T','fujitsu':'6702.T','ntt':'9432.T',
+  'recruit':'6098.T','shin-etsu':'4063.T','daikin':'6367.T',
+  'uniqlo':'9983.T','fast retailing':'9983.T','takeda':'4502.T',
+  'canon':'7751.T','keyence':'6861.T','tokyo electron':'8035.T',
+  'daiichi sankyo':'4568.T',
+  'reliance':'RELIANCE.NS','tcs':'TCS.NS','hdfc':'HDFCBANK.NS',
+  'infosys':'INFY.NS','wipro':'WIPRO.NS','icici':'ICICIBANK.NS',
+  'bajaj':'BAJFINANCE.NS','titan':'TITAN.NS',
+  // Australian
+  'commonwealth bank':'CBA.AX','cba':'CBA.AX','bhp':'BHP.AX',
+  'csl':'CSL.AX','nab':'NAB.AX','macquarie':'MQG.AX','wesfarmers':'WES.AX',
+  // Canadian
+  'royal bank':'RY','royal bank canada':'RY','td bank':'TD',
+  'enbridge':'ENB','canadian national':'CNR','bank of montreal':'BMO',
+  'nova scotia bank':'BNS','canadian pacific':'CP','manulife':'MFC',
+  // Brazilian  
+  'vale':'VALE','petrobras':'PBR','itau':'ITUB','bradesco':'BBD',
+  'ambev':'ABEV','embraer':'ERJ',
+  // Nordic
+  'novo nordisk':'NVO','novozymes':'NVO','volvo':'VOLV-B.ST',
+  'atlas copco':'ATCO-A.ST','equinor':'EQNR','statoil':'EQNR',
+  'dnb':'DNB.OL',
+  // Swiss
+  'nestle':'NESN.SW','nestlé':'NESN.SW','lonza':'LONN.SW','ubs':'UBSG.SW',
+  'richemont':'CFR.SW','cartier':'CFR.SW',
+  // Dutch
+  'philips':'PHIA.AS','heineken':'HEIA.AS','ing':'INGA.AS',
+  // Italian
+  'eni':'ENI.MI','enel':'ENEL.MI','intesa sanpaolo':'ISP.MI',
+  'unicredit':'UCG.MI','stellantis':'STLAM.MI','pirelli':'PIRC.MI',
+  // Spanish
+  'telefonica':'TEF.MC','telefónica':'TEF.MC','amadeus':'AMS.MC',
+  // UK extras
+  'astrazeneca':'AZN.L','lloyds':'LLOY.L','national grid':'NG.L',
+  'bt group':'BT-A.L','relx':'REL.L','diageo':'DGE.L','experian':'EXPN.L',
+  'burberry':'BRBY.L',
+  // US extras  
+  'applied materials':'AMAT','lam research':'LRCX','kla':'KLAC',
+  'texas instruments':'TXN','analog devices':'ADI','marvell':'MRVL',
+  'on semiconductor':'ON','monolithic power':'MPWR',
+  'lockheed':'LMT','raytheon':'RTX','northrop grumman':'NOC',
+  'general dynamics':'GD','huntington ingalls':'HII',
+  'regeneron':'REGN','vertex pharma':'VRTX','vertex':'VRTX',
+  'intuitive surgical':'ISRG','medtronic':'MDT','stryker':'SYK',
+  'boston scientific':'BSX','abbott':'ABT','dexcom':'DXCM','idexx':'IDXX',
+  'block':'SQ','affirm':'AFRM','sofi':'SOFI','nu bank':'NU','nubank':'NU',
+  'mercadolibre':'MELI','sea limited':'SE',
+  'american tower':'AMT','prologis':'PLD','equinix':'EQIX',
+  'crown castle':'CCI','realty income':'O','digital realty':'DLR',
+  'metlife':'MET','prudential':'PRU','aflac':'AFL','chubb':'CB',
+  'progressive':'PGR','munich re':'MUV2.DE','munich reinsurance':'MUV2.DE',
+  'microstrategy':'MSTR','marathon digital':'MARA','riot platforms':'RIOT',
+  'ge aerospace':'GE','illinois tool':'ITW','rockwell':'ROK',
+  'parker hannifin':'PH','eaton':'ETN','danaher':'DHR','fortive':'FTV',
+  'carrier':'CARR','otis':'OTIS','ecolab':'ECL','sherwin williams':'SHW',
+  'ppg':'PPG','dupont':'DD','lyondellbasell':'LYB','albemarle':'ALB',
+  'freeport':'FCX','newmont':'NEM','barrick':'GOLD','kinross':'KGC',
+  'lululemon':'LULU','crocs':'CROX','under armour':'UAA','birkenstock':'BIRK',
+  'rivian':'RIVN','lucid motors':'LCID','nextera':'NEE','enphase':'ENPH',
+  'first solar':'FSLR','solaredge':'SEDG',
+  'at&t':'T','verizon':'VZ','t-mobile':'TMUS','tmobile':'TMUS',
+  'america movil':'AMX','orange telecom':'ORAN',
 }
 
 // ─── Ticker resolution ────────────────────────────────────────────────────────
@@ -339,6 +412,16 @@ export async function GET(req:NextRequest) {
   incrementUsage()
   if(!query)  return NextResponse.json({error:'Kein Symbol angegeben.'},{status:400})
   if(!fmpKey) return NextResponse.json({error:'FMP_API_KEY nicht gesetzt.'},{status:500})
+
+  // Special case: private companies not listed on any exchange
+  const queryLower = query.toLowerCase().trim()
+  const PRIVATE_COMPANIES: Record<string,string> = {
+    'huawei': 'Huawei Technologies ist nicht börsennotiert (privates Unternehmen). Öffentlich verfügbare Alternativen: Xiaomi (1810.HK), Tencent (0700.HK).',
+    '华为': 'Huawei Technologies ist nicht börsennotiert (privates Unternehmen).',
+  }
+  if (PRIVATE_COMPANIES[queryLower]) {
+    return NextResponse.json({ error: PRIVATE_COMPANIES[queryLower] }, { status: 404 })
+  }
 
   const ticker=await resolveTicker(query,fmpKey)
 
