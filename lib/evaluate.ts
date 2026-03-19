@@ -46,6 +46,15 @@ export interface StockData {
 
   error?: string
   rateLimited?: boolean
+  // Historical annual data for mini charts (oldest → newest)
+  historicalMetrics?: {
+    pe?:             { date: string; value: number }[]
+    ps?:             { date: string; value: number }[]
+    pb?:             { date: string; value: number }[]
+    roe?:            { date: string; value: number }[]
+    netMargin?:      { date: string; value: number }[]
+    revenueGrowth?:  { date: string; value: number }[]
+  }
 }
 
 export interface MetricResult {
