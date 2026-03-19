@@ -214,11 +214,12 @@ function PriceTarget({ data, t, lang }: { data: StockData; t: Translations; lang
     return `${fmt(v * rate)} € (${fmt(v)} ${currency})`
   }
 
-  // Format: EUR value bold, USD value light, % on own line
+  // Format: EUR value bold, USD value light with currency symbol
+  const currencySymbol = currency === 'USD' ? '$' : currency === 'GBP' ? '£' : currency
   const fmtRow = (v: number) => {
     const eurVal = currency === 'EUR' || !data.priceEur ? v : v * (data.priceEur / (data.price ?? 1))
     const origVal = currency !== 'EUR' && data.priceEur ? v : null
-    return { eur: fmt(eurVal), orig: origVal ? fmt(v) : null }
+    return { eur: fmt(eurVal), orig: origVal ? `${fmt(v)} ${currencySymbol}` : null }
   }
   const dcfRow   = dcfValue   ? fmtRow(dcfValue)   : null
   const lynchRow = lynchValue ? fmtRow(lynchValue)  : null
@@ -347,32 +348,38 @@ export default function Home() {
   const warnCount  = metrics.filter(m => m.score === 'warn').length
   const badCount   = metrics.filter(m => m.score === 'bad').length
 
-  // RSI alignment: bottom of RSI card = bottom of Nettomarge card
+  // RSI alignment: bottom of RSI = bottom of Nettomarge
   useEffect(() => {
     if (!data) return
+    let rafId = 0
     const align = () => {
-      if (window.innerWidth < 720) return
-      const nettoEl = document.querySelector('[data-key="netMargin"]') as HTMLElement
-      const rsiEl   = document.querySelector('[data-key="rsi"]') as HTMLElement
-      const spacer  = document.querySelector('.rsi-spacer') as HTMLElement
-      if (!nettoEl || !rsiEl || !spacer) return
-      // Step 1: reset spacer
-      spacer.style.height = '0px'
-      spacer.style.flexGrow = '0'
-      // Step 2: wait TWO animation frames so layout has fully reflowed
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const nettoBottom = nettoEl.getBoundingClientRect().bottom
-        const rsiBottom   = rsiEl.getBoundingClientRect().bottom
-        const diff = nettoBottom - rsiBottom
-        // diff > 0 means RSI is above Nettomarge → add height
-        // diff < 0 means RSI is below Nettomarge → should not happen but clamp to 0
-        spacer.style.height = Math.max(0, diff) + 'px'
-      }))
+      cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        if (window.innerWidth < 720) return
+        const nettoEl = document.querySelector('[data-key="netMargin"]') as HTMLElement
+        const rsiEl   = document.querySelector('[data-key="rsi"]') as HTMLElement
+        const spacer  = document.querySelector('.rsi-spacer') as HTMLElement
+        if (!nettoEl || !rsiEl || !spacer) return
+        // Reset first, measure in next frame after reflow
+        spacer.style.cssText = 'height:0px;flex-grow:0;flex-shrink:0'
+        requestAnimationFrame(() => {
+          const diff = nettoEl.getBoundingClientRect().bottom - rsiEl.getBoundingClientRect().bottom
+          spacer.style.height = Math.max(0, diff) + 'px'
+        })
+      })
     }
-    // Multiple attempts as images/fonts may shift layout
-    const timers = [100, 400, 900].map(d => setTimeout(align, d))
+    // Observe the grid for size changes (more reliable than setTimeout)
+    const grid = document.querySelector('.metrics-grid')
+    const ro = grid ? new ResizeObserver(align) : null
+    ro?.observe(grid!)
+    const timers = [50, 200, 600, 1200].map(d => setTimeout(align, d))
     window.addEventListener('resize', align)
-    return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', align) }
+    return () => {
+      cancelAnimationFrame(rafId)
+      ro?.disconnect()
+      timers.forEach(clearTimeout)
+      window.removeEventListener('resize', align)
+    }
   }, [data, metrics])
 
   return (
@@ -434,13 +441,13 @@ export default function Home() {
                   {/* Row 1: Desktop = USD | EUR  /  Mobile = EUR bold */}
                   {data.priceEur != null && data.currency !== 'EUR' ? (
                     <>
-                      {/* Desktop row 1: orig USD */}
-                      <div className="price-orig-main price-desktop-row1">
-                        {Number(data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}{data.currency}
+                      {/* Row 1: EUR bold */}
+                      <div className="price-eur-main">
+                        {Number(data.priceEur).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}€
                       </div>
-                      {/* Desktop row 2: EUR */}
-                      <div className="price-eur-main price-desktop-row2">
-                        {Number(data.priceEur).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}€
+                      {/* Row 2: USD light */}
+                      <div className="price-orig-main">
+                        {Number(data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}{data.currency}
                       </div>
                     </>
                   ) : (
