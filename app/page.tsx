@@ -61,9 +61,25 @@ function CompanyInfo({ data }: { data: StockData }) {
     data.ceo       && `👤 CEO: ${data.ceo}`,
   ].filter(Boolean) as string[]
 
+  // Build German Wikipedia URL from company name
+  const wikiName  = (data.name ?? '').replace(/\s+/g, '_').replace(/&/g, '%26')
+  const wikiUrl   = wikiName ? `https://de.wikipedia.org/wiki/${wikiName}` : null
+
   return (
     <div className="company-info">
-      {data.description && <p className="company-desc">{data.description}</p>}
+      {data.description && (
+        <p className="company-desc">
+          {data.description}
+          {wikiUrl && (
+            <> – <a
+              href={wikiUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="wiki-link"
+            >Wikipedia</a></>
+          )}
+        </p>
+      )}
       {facts.length > 0 && (
         <div className="company-facts">
           {facts.map((f, i) => <span key={i} className="company-fact">{f}</span>)}
@@ -208,6 +224,30 @@ export default function Home() {
   const goodCount  = metrics.filter(m => m.score === 'good').length
   const warnCount  = metrics.filter(m => m.score === 'warn').length
   const badCount   = metrics.filter(m => m.score === 'bad').length
+
+  // Dynamically align RSI bottom with Nettomarge bottom
+  useEffect(() => {
+    if (!data) return
+    const align = () => {
+      const nettoEl = document.querySelector('[data-key="netMargin"]') as HTMLElement
+      const rsiEl   = document.querySelector('[data-key="rsi"]') as HTMLElement
+      const spacer  = document.querySelector('.rsi-spacer') as HTMLElement
+      if (!nettoEl || !rsiEl || !spacer || window.innerWidth < 720) return
+      const nettoBottom = nettoEl.getBoundingClientRect().bottom
+      const rsiTop      = rsiEl.getBoundingClientRect().top
+      const currentSpacer = spacer.offsetHeight
+      // We want rsiEl bottom = nettoEl bottom → rsiTop = nettoBottom - rsiEl.offsetHeight
+      const targetRsiTop = nettoBottom - rsiEl.offsetHeight
+      const diff = targetRsiTop - rsiTop
+      const newHeight = Math.max(0, currentSpacer + diff)
+      spacer.style.flexGrow = '0'
+      spacer.style.height = newHeight + 'px'
+    }
+    // Run after render and on resize
+    const timer = setTimeout(align, 100)
+    window.addEventListener('resize', align)
+    return () => { clearTimeout(timer); window.removeEventListener('resize', align) }
+  }, [data, metrics])
 
   return (
     <main className="page-container">
