@@ -442,13 +442,20 @@ export async function GET(req:NextRequest) {
       const mapRow = (key: string) => rows
         .filter((r:Record<string,unknown>) => r.date && r[key] != null && isFinite(Number(r[key])))
         .map((r:Record<string,unknown>) => ({ date: String(r.date).slice(0,4), value: Number(r[key]) }))
+      const mapRowMulti = (...keys: string[]) => {
+        for (const key of keys) {
+          const result = mapRow(key)
+          if (result.length > 0) return result
+        }
+        return []
+      }
       return {
-        pe:            mapRow('priceEarningsRatio'),
-        ps:            mapRow('priceToSalesRatio'),
-        pb:            mapRow('priceToBookRatio'),
-        roe:           mapRow('returnOnEquity'),
-        netMargin:     mapRow('netProfitMargin'),
-        revenueGrowth: mapRow('revenueGrowth'),
+        pe:            mapRowMulti('priceEarningsRatio','peRatio','pe'),
+        ps:            mapRowMulti('priceToSalesRatio','psRatio','ps'),
+        pb:            mapRowMulti('priceToBookRatio','pbRatio','pb'),
+        roe:           mapRowMulti('returnOnEquity','roe'),
+        netMargin:     mapRowMulti('netProfitMargin','netMargin'),
+        revenueGrowth: mapRowMulti('revenueGrowth','revenue_growth'),
       }
     })(),
   })
