@@ -719,8 +719,7 @@ body {
   .price-eur-main   { font-size: 1.05rem; }
   .price-time-desktop { display: none; }
   /* On mobile: orig row becomes smaller, below EUR */
-  .price-desktop-row1 { order: 2; font-size: 0.72rem; }
-  .price-desktop-row2 { order: 1; }
+
 }
 
 /* ── Price target: same width as chart (left half of bottom-grid) ── */
