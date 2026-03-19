@@ -11,13 +11,14 @@ interface StockMetrics {
   cashflow:number|null; debt:number|null; currentRatio:number|null; rsi:number|null
   dividendYield:number|null; revenueGrowth:number|null; earningsGrowth:number|null
   hist:{ date:string; close:number }[]
+  historicalRatios?: Record<string,unknown>[]
 }
 function empty(): StockMetrics {
   return { name:null,sector:null,industry:null,description:null,price:null,currency:null,
     ipoDate:null,city:null,country:null,employees:null,ceo:null,pe:null,ps:null,pb:null,
     roe:null,roa:null,grossMargin:null,operatingMargin:null,netMargin:null,cashflow:null,
     debt:null,currentRatio:null,rsi:null,dividendYield:null,revenueGrowth:null,
-    earningsGrowth:null,hist:[] }
+    earningsGrowth:null,hist:[],historicalRatios:[] }
 }
 function merge(base:StockMetrics, patch:Partial<StockMetrics>): StockMetrics {
   const out={...base}
@@ -148,13 +149,14 @@ async function resolveTicker(query:string,fmpKey:string):Promise<string> {
 async function fromFMP(ticker:string,key:string):Promise<Partial<StockMetrics>> {
   // For HK stocks like 1810.HK, FMP may need the ticker without exchange suffix
   // Try both formats
-  const [pR,rR,mR,gR,tR,hR]=await Promise.all([
+  const [pR,rR,mR,gR,tR,hR,rAnn]=await Promise.all([
     get(`https://financialmodelingprep.com/stable/profile?symbol=${ticker}&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/ratios-ttm?symbol=${ticker}&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/key-metrics-ttm?symbol=${ticker}&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/financial-growth?symbol=${ticker}&limit=1&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/technical-indicator/daily?symbol=${ticker}&type=rsi&period=14&apikey=${key}`),
     get(`https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${ticker}&limit=1300&apikey=${key}`),
+    get(`https://financialmodelingprep.com/stable/ratios/${ticker}?limit=10&apikey=${key}`),
   ])
   if(isLimited(pR)) return {}
   const p=first(pR),r=first(rR),m=first(mR),g=first(gR)
@@ -181,6 +183,7 @@ async function fromFMP(ticker:string,key:string):Promise<Partial<StockMetrics>> 
     currentRatio:num(r,'currentRatioTTM','currentRatio'),
     dividendYield:num(r,'dividendYieldTTM','dividendYield'),
     revenueGrowth:num(g,'revenueGrowth'),earningsGrowth:num(g,'netIncomeGrowth'),rsi,hist,
+    historicalRatios: Array.isArray(rAnn) ? (rAnn as Record<string,unknown>[]).slice().reverse() : [],
   }
 }
 
@@ -434,5 +437,19 @@ export async function GET(req:NextRequest) {
     rsi:result.rsi,dividendYield:result.dividendYield,
     revenueGrowth:result.revenueGrowth,earningsGrowth:result.earningsGrowth,
     chartData,crossSignal,ma50Latest:ma50L,ma200Latest:ma200L,_sources,
+    historicalMetrics: (() => {
+      const rows = result.historicalRatios ?? []
+      const mapRow = (key: string) => rows
+        .filter((r:Record<string,unknown>) => r.date && r[key] != null && isFinite(Number(r[key])))
+        .map((r:Record<string,unknown>) => ({ date: String(r.date).slice(0,4), value: Number(r[key]) }))
+      return {
+        pe:            mapRow('priceEarningsRatio'),
+        ps:            mapRow('priceToSalesRatio'),
+        pb:            mapRow('priceToBookRatio'),
+        roe:           mapRow('returnOnEquity'),
+        netMargin:     mapRow('netProfitMargin'),
+        revenueGrowth: mapRow('revenueGrowth'),
+      }
+    })(),
   })
 }
