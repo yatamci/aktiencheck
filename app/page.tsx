@@ -320,7 +320,9 @@ export default function Home() {
   // Language persistence
   useEffect(() => {
     const stored = localStorage.getItem('lang') as Lang | null
-    if (stored === 'en' || stored === 'de') setLangState(stored)
+    // Only apply stored preference; default is 'de' (set in useState)
+    if (stored === 'en') setLangState('en')
+    // 'de' is already the default, no need to set
   }, [])
 
   function toggleLang() {
@@ -488,12 +490,20 @@ export default function Home() {
               ))}
             </div>
             <div className="grid-col">
-              {RIGHT_CATS.map(cat => (
+              {/* Liquidität & Dividende first */}
+              {RIGHT_CATS.slice(0,2).map(cat => (
                 <CategorySection key={cat.titleKey} title={t.cats[cat.titleKey as keyof typeof t.cats] ?? cat.titleKey}
                   metrics={cat.keys.map(k=>metricsMap[k]).filter(Boolean)} lang={langState}
                   historicalMetrics={data.historicalMetrics} />
               ))}
+              {/* Spacer pushes RSI down to align with Nettomarge */}
               <div className="rsi-spacer" />
+              {/* Technische Analyse (RSI) last */}
+              {RIGHT_CATS.slice(2).map(cat => (
+                <CategorySection key={cat.titleKey} title={t.cats[cat.titleKey as keyof typeof t.cats] ?? cat.titleKey}
+                  metrics={cat.keys.map(k=>metricsMap[k]).filter(Boolean)} lang={langState}
+                  historicalMetrics={data.historicalMetrics} />
+              ))}
             </div>
           </div>
 
