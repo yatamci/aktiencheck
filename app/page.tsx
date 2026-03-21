@@ -5,6 +5,7 @@ import ThemeToggle    from '../components/ThemeToggle'
 import LanguageToggle from '../components/LanguageToggle'
 import MetricCard     from '../components/MetricCard'
 import SearchBar      from '../components/SearchBar'
+import AlphaBar      from '../components/AlphaBar'
 import MAChart        from '../components/MAChart'
 import MiniChart      from '../components/MiniChart'
 import { StockData, buildMetrics, calculateOverallScore, MetricResult, Lang } from '../lib/evaluate'
@@ -423,7 +424,9 @@ export default function Home() {
         </div>
       </header>
 
-      <SearchBar onSearch={search} loading={loading} placeholder={t.searchPlaceholder} analyzeLabel={t.analyze} />
+      <SearchBar key={langState} onSearch={search} loading={loading} placeholder={t.searchPlaceholder} analyzeLabel={t.analyze} />
+
+      <AlphaBar />
 
       {loading && (
         <div className="loading-wrapper fade-in">
@@ -458,21 +461,9 @@ export default function Home() {
             <div className="stock-header-top">
               {data.symbol && <div className="stock-logo-wrap"><StockLogo symbol={data.symbol} name={data.name} /></div>}
               <div className="stock-identity">
-                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                  <span className="stock-name">{data.name || data.symbol}</span>
-                  <button
-                    className="share-btn"
-                    title={langState==='de'?'Link kopieren':'Copy link'}
-                    onClick={() => {
-                      navigator.clipboard?.writeText(window.location.href)
-                        .then(() => {/* copied */})
-                        .catch(() => {})
-                    }}
-                  >🔗</button>
-                </div>
+                <span className="stock-name">{data.name || data.symbol}</span>
                 <div className="stock-meta">
                   {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
-                  {data.sector && <span className="stock-sector">{data.sector}</span>}
                 </div>
               </div>
               {data.price != null && (
