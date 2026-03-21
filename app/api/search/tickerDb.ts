@@ -686,3 +686,5 @@ const DB: { symbol: string; name: string; exchange: string }[] = [
 export const TICKER_DB: TickerEntry[] = Array.from(
   new Map(DB.map(r => [r.symbol, r])).values()
 )
+
+export const tickerDb = TICKER_DB
