@@ -311,10 +311,13 @@ async function fromYahooFinance(ticker:string):Promise<Partial<StockMetrics>> {
   // Yahoo uses 1810.HK, 005930.KS, 7203.T etc. directly
   // Add User-Agent to avoid 429 from Vercel IPs
   const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-  const url2=`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=summaryDetail%2CdefaultKeyStatistics%2CfinancialData%2CassetProfile`
-  const [chartRaw,summaryRaw]=await Promise.all([
+  const summaryModules = 'summaryDetail%2CdefaultKeyStatistics%2CfinancialData%2CassetProfile'
+  const url2a = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${summaryModules}`
+  const url2b = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${summaryModules}`
+  const [chartRaw, summaryRaw] = await Promise.all([
     fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`,{headers,signal:AbortSignal.timeout(8000),cache:'no-store'}).then(r=>r.json()).catch(()=>null),
-    fetch(url2,{headers,signal:AbortSignal.timeout(8000),cache:'no-store'}).then(r=>r.json()).catch(()=>null),
+    fetch(url2a,{headers,signal:AbortSignal.timeout(8000),cache:'no-store'}).then(r=>r.json())
+      .catch(()=>fetch(url2b,{headers,signal:AbortSignal.timeout(8000),cache:'no-store'}).then(r=>r.json()).catch(()=>null)),
   ])
   let hist:StockMetrics['hist']=[]
   try {
@@ -339,9 +342,15 @@ async function fromYahooFinance(ticker:string):Promise<Partial<StockMetrics>> {
       pe:rn(sd,'trailingPE')??rn(sd,'forwardPE'),pb:rn(ks,'priceToBook'),
       ps:rn(ks,'priceToSalesTrailing12Months'),roe:rn(fd,'returnOnEquity'),roa:rn(fd,'returnOnAssets'),
       grossMargin:rn(fd,'grossMargins'),operatingMargin:rn(fd,'operatingMargins'),netMargin:rn(fd,'profitMargins'),
-      debt:rn(ks,'debtToEquity'),currentRatio:rn(fd,'currentRatio'),cashflow:rn(fd,'freeCashflow'),
+      debt:rn(ks,'debtToEquity'),currentRatio:rn(fd,'currentRatio'),cashflow:(() => {
+        const fcf = rn(fd,'freeCashflow')
+        const shares = rn(ks,'sharesOutstanding') ?? rn(sd,'sharesOutstanding')
+        if (fcf != null && shares != null && shares > 0) return fcf / shares
+        return null
+      })(),
       dividendYield:rn(sd,'dividendYield')??rn(sd,'trailingAnnualDividendYield'),
       earningsGrowth:rn(fd,'earningsGrowth'),revenueGrowth:rn(fd,'revenueGrowth'),hist,
+      ipoDate:str(ks,'lastSplitDate')??null,  // rough proxy
     }
   } catch{return{hist}}
 }
@@ -553,7 +562,20 @@ export async function GET(req:NextRequest) {
     pe:result.pe,ps:result.ps,pb:result.pb,roe:result.roe,roa:result.roa,
     grossMargin:result.grossMargin,operatingMargin:result.operatingMargin,netMargin:result.netMargin,
     cashflow:result.cashflow,debt:result.debt,currentRatio:result.currentRatio,
-    rsi:result.rsi,dividendYield:result.dividendYield,
+    rsi: (() => {
+      if (result.rsi != null) return result.rsi
+      // Calculate RSI from price history if not available
+      const closes = result.hist.slice(-15).map((h:{close:number})=>h.close)
+      if (closes.length < 14) return null
+      let gains=0, losses=0
+      for(let i=1;i<closes.length;i++){
+        const d=closes[i]-closes[i-1]
+        if(d>0) gains+=d; else losses+=Math.abs(d)
+      }
+      const n=closes.length-1
+      const rs=(gains/n)/((losses/n)||0.0001)
+      return Math.round(100-(100/(1+rs)))
+    })(),dividendYield:result.dividendYield,
     revenueGrowth:result.revenueGrowth,earningsGrowth:result.earningsGrowth,
     chartData,crossSignal,ma50Latest:ma50L,ma200Latest:ma200L,
     _sources:[..._sources, `histRatios:${result.historicalRatios?.length??0}`],
