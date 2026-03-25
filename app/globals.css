@@ -676,40 +676,88 @@ body {
 .translate-btn:disabled { opacity: 0.5; cursor: wait; }
 
 /* ════════════════════════════════════════
-   Stock Header – 3-col grid + price rows
+   Stock Header
+   Uses a 3-col × 2-row grid so identity
+   rows and price rows share exact heights
 ════════════════════════════════════════ */
 .stock-header-top {
   display: grid;
+  /* col1=logo  col2=identity  col3=price */
   grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: 14px;
+  /* row1=name/price  row2=ticker/date */
+  grid-template-rows: auto auto;
+  gap: 6px 14px;
   margin-bottom: 14px;
 }
-.stock-identity   { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.stock-name       { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stock-price { text-align: right; display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
 
-/* EUR value: bold, prominent */
+/* Logo spans both rows */
+.stock-logo-wrap {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: center;
+}
 
-/* Original currency (USD etc): light weight, muted */
+/* Identity rows */
+.stock-identity {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.stock-name { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stock-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* Price column – explicit rows matching identity rows */
+.stock-price {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  display: grid;
+  grid-template-rows: subgrid;
+  text-align: right;
+  align-items: baseline;
+}
+
+/* Fallback for browsers without subgrid */
+@supports not (grid-template-rows: subgrid) {
+  .stock-price {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+.price-eur-main {
+  font-family: 'DM Mono', monospace;
+  font-size: 1.35rem; font-weight: 700; color: var(--text);
+  white-space: nowrap; align-self: center;
+}
+/* Second row of price: date (or orig currency when present) */
+.price-date-row {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  align-self: center;
+}
+.price-orig-main {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.77rem; font-weight: 400; color: var(--text-3);
+  white-space: nowrap;
+}
 .price-date {
   font-family: 'DM Mono', monospace;
   font-size: 0.68rem; color: var(--text-3);
-  white-space: nowrap; line-height: 1.2;
+  white-space: nowrap;
 }
 .price-time-desktop { display: inline; }
 
 @media (min-width: 601px) {
-  
+  .price-eur-main { font-size: 1.5rem; }
 }
 @media (max-width: 600px) {
-  .stock-header-top { gap: 10px; }
+  .stock-header-top { gap: 4px 10px; }
   .stock-name       { font-size: 1.05rem; }
   .price-eur-main   { font-size: 1.05rem; }
   .price-time-desktop { display: none; }
-  /* On mobile: orig row becomes smaller, below EUR */
-
 }
 
 /* ── Price target: same width as chart (left half of bottom-grid) ── */
@@ -815,3 +863,68 @@ body {
 .browse-card-symbol   { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--accent); background: var(--accent-bg); padding: 1px 7px; border-radius: 999px; }
 .browse-card-exchange { font-size: 0.65rem; color: var(--text-3); }
 .browse-count { font-size: 0.72rem; font-weight: 400; color: var(--text-3); background: var(--surface); border: 1px solid var(--border); padding: 1px 9px; border-radius: 999px; }
+
+/* ════════════════════════════════════════
+   Watchlist
+════════════════════════════════════════ */
+.watchlist-wrap {
+  display: flex; align-items: center; gap: 6px;
+  position: relative;
+}
+
+/* Star button on the stock name */
+.watchlist-star {
+  background: transparent; border: none; cursor: pointer;
+  font-size: 1.1rem; color: var(--text-3);
+  padding: 2px 3px; border-radius: 4px;
+  transition: color 0.15s, transform 0.15s;
+  line-height: 1; display: flex; align-items: center;
+}
+.watchlist-star:hover   { color: var(--warn); transform: scale(1.15); }
+.watchlist-star--on     { color: var(--warn); }
+
+/* Header watchlist toggle */
+.watchlist-toggle {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 6px 10px;
+  cursor: pointer; color: var(--warn); font-size: 0.82rem;
+  transition: background 0.15s;
+}
+.watchlist-toggle:hover { background: var(--surface-hover); }
+.watchlist-icon { font-size: 0.9rem; }
+.watchlist-count { font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 700; }
+
+/* Dropdown panel */
+.watchlist-dropdown-wrap { position: relative; }
+.watchlist-panel {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  min-width: 220px; max-width: 300px;
+  background: var(--surface-solid, var(--surface));
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: var(--shadow-md); z-index: 100;
+  overflow: hidden;
+}
+.watchlist-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: 0.78rem; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.watchlist-close {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-3); font-size: 0.85rem; padding: 2px 4px;
+  border-radius: 4px; line-height: 1;
+}
+.watchlist-close:hover { color: var(--text); background: var(--surface-hover); }
+.watchlist-item {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; padding: 9px 14px; gap: 8px;
+  background: transparent; border: none; cursor: pointer;
+  text-align: left; border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.watchlist-item:last-child { border-bottom: none; }
+.watchlist-item:hover { background: var(--surface-hover); }
+.watchlist-item-name { font-size: 0.82rem; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watchlist-item-sym  { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--accent); background: var(--accent-bg); padding: 1px 7px; border-radius: 999px; flex-shrink: 0; }
