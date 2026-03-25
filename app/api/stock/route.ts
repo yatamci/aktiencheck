@@ -492,8 +492,9 @@ export async function GET(req:NextRequest) {
     const d=await fromTwelveData(ticker,tdKey)
     if(Object.values(d).some(v=>v!=null)){result=merge(result,d);_sources.push('TwelveData')}
   }
-  // Stooq: free international fallback (no key needed), good for HK/DE/JP stocks
-  if(result.hist.length===0 || result.price==null){
+  // Stooq: free international fallback (no key needed)
+  // Use for: empty hist, missing price, OR any HK/KS/T stock (Yahoo sometimes blocked)
+  if(result.hist.length===0 || result.price==null || isHK){
     const d=await fromStooq(ticker)
     if(Object.values(d).some(v=>v!=null)){result=merge(result,d);_sources.push('Stooq')}
   }
@@ -530,10 +531,10 @@ export async function GET(req:NextRequest) {
   const rawDesc=result.description
   let shortDesc:string|null=null
   if(rawDesc){
-    if(rawDesc.length<=400){shortDesc=rawDesc}
+    if(rawDesc.length<=600){shortDesc=rawDesc}
     else{
       let last=-1
-      for(let i=0;i<Math.min(rawDesc.length-1,440);i++){
+      for(let i=0;i<Math.min(rawDesc.length-1,650);i++){
         if('.!?'.includes(rawDesc[i])&&(rawDesc[i+1]===' '||rawDesc[i+1]==='\n')&&i<=400) last=i+1
       }
       shortDesc=last>0?rawDesc.slice(0,last).trim():rawDesc.slice(0,400).trim()
@@ -552,7 +553,7 @@ export async function GET(req:NextRequest) {
   const crossSignal: 'golden'|'death'|'none' = ma50L&&ma200L ? (ma50L>ma200L ? 'golden' : 'death') : 'none'
 
   return NextResponse.json({
-    name:result.name??ticker,symbol:ticker,sector:result.sector,industry:result.industry,
+    name:result.name?.trim()||ticker,symbol:ticker,sector:result.sector,industry:result.industry,
     priceDate: result.hist.length > 0 ? [...result.hist].sort((a,b)=>b.date.localeCompare(a.date))[0].date + 'T16:00:00' : new Date().toISOString(),
     price:result.price,priceEur,currency,description:shortDesc,
     founded:result.ipoDate?.slice(0,4)??null,
