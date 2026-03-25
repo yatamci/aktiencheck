@@ -111,14 +111,18 @@ export default function MetricCard({ metric, lang, historicalData }: { metric: M
             </div>
           </div>
 
-          {historicalData && historicalData.length >= 2 && (
+          {historicalData && historicalData.length >= 2 ? (
             <MiniChart
               data={historicalData}
-              color="var(--accent)"
-              label={lang === 'en' ? 'Historical (annual)' : 'Historisch (jährlich)'}
-              formatValue={(v) => metric.formatType === 'percent' ? (v*100).toFixed(1)+'%' : metric.formatType === 'ratio' ? v.toFixed(2) : v.toFixed(1)}
+              color={metric.score === 'good' ? 'var(--good)' : metric.score === 'bad' ? 'var(--bad)' : 'var(--warn)'}
+              label={lang === 'en' ? `Historical trend (${historicalData[0].date}–${historicalData[historicalData.length-1].date})` : `Historischer Verlauf (${historicalData[0].date}–${historicalData[historicalData.length-1].date})`}
+              formatValue={(v) => {
+                if (metric.formatType === 'percent') return (v > 1 ? v : v * 100).toFixed(1) + ' %'
+                if (metric.formatType === 'ratio')   return v.toFixed(2)
+                return v.toFixed(1)
+              }}
             />
-          )}
+          ) : null}
 
         </div>
       </div>
