@@ -6,6 +6,7 @@ import LanguageToggle from '../components/LanguageToggle'
 import MetricCard     from '../components/MetricCard'
 import SearchBar      from '../components/SearchBar'
 import AlphaBar      from '../components/AlphaBar'
+import Watchlist     from '../components/Watchlist'
 import MAChart        from '../components/MAChart'
 import MiniChart      from '../components/MiniChart'
 import { StockData, buildMetrics, calculateOverallScore, MetricResult, Lang } from '../lib/evaluate'
@@ -103,10 +104,15 @@ function CompanyInfo({ data, t, lang }: { data: StockData; t: Translations; lang
 
   return (
     <div className="company-info">
-      {desc && (
+      {desc ? (
         <p className="company-desc">
           {desc}
           {wikiUrl && <> – <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="wiki-link">{t.wikiMore}</a></>}
+        </p>
+      ) : (
+        <p className="company-desc" style={{color:'var(--text-3)',fontStyle:'italic'}}>
+          {lang === 'de' ? 'Keine Unternehmensbeschreibung verfügbar.' : 'No company description available.'}
+          {wikiUrl && <> <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="wiki-link">{t.wikiMore}</a></>}
         </p>
       )}
       {facts.length > 0 && (
@@ -204,8 +210,8 @@ function PriceTarget({ data, t, lang }: { data: StockData; t: Translations; lang
   const lynchPE    = growthRate > 0 ? Math.min(growthRate * 100, 50) : null
   const lynchValue = eps && lynchPE ? eps * lynchPE : null
 
-  if (!dcfValue && !lynchValue) return null
-
+  // Always show box even with no data (show dashes like other metric cards)
+  const hasData = dcfValue != null || lynchValue != null
   const avg       = dcfValue && lynchValue ? (dcfValue + lynchValue) / 2 : dcfValue ?? lynchValue ?? 0
   const pctDiff   = price > 0 ? ((avg - price) / price) * 100 : 0
   const upside    = pctDiff > 0
@@ -227,6 +233,31 @@ function PriceTarget({ data, t, lang }: { data: StockData; t: Translations; lang
   const lynchRow = lynchValue ? fmtRow(lynchValue)  : null
   const avgRow   = fmtRow(avg)
 
+  if (!hasData) {
+    // Show empty box with dashes like other metric cards
+    return (
+      <div className="glass-card price-target-card">
+        <div className="pt-grid">
+          <div className="pt-header-row">
+            <span className="pt-col-label">{lang === 'de' ? 'Modell' : 'Model'}</span>
+            <span className="pt-col-header">EUR</span>
+          </div>
+          {[t.dcfModel, t.lynchModel, t.fairValueLabel].map(label => (
+            <div key={label} className="pt-row">
+              <span className="pt-label">{label}</span>
+              <span className="pt-val-eur" style={{color:'var(--text-3)'}}>–</span>
+            </div>
+          ))}
+        </div>
+        <p className="pt-disclaimer">
+          {lang === 'de'
+            ? 'Unzureichende Datenbasis für Berechnung.'
+            : 'Insufficient data for calculation.'}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="glass-card price-target-card">
       <div className="pt-grid">
@@ -243,11 +274,23 @@ function PriceTarget({ data, t, lang }: { data: StockData; t: Translations; lang
             <span className="pt-val-eur">{dcfRow.eur} €</span>
           </div>
         )}
+        {!dcfRow && (
+          <div className="pt-row">
+            <span className="pt-label">{t.dcfModel}</span>
+            <span className="pt-val-eur" style={{color:'var(--text-3)'}}>–</span>
+          </div>
+        )}
         {lynchRow && (
           <div className="pt-row">
             <span className="pt-label">{t.lynchModel}</span>
             {lynchRow.orig && <span className="pt-val-orig">{lynchRow.orig}</span>}
             <span className="pt-val-eur">{lynchRow.eur} €</span>
+          </div>
+        )}
+        {!lynchRow && (
+          <div className="pt-row">
+            <span className="pt-label">{t.lynchModel}</span>
+            <span className="pt-val-eur" style={{color:'var(--text-3)'}}>–</span>
           </div>
         )}
         <div className="pt-row pt-avg-row">
@@ -373,41 +416,34 @@ export default function Home() {
   const warnCount  = metrics.filter(m => m.score === 'warn').length
   const badCount   = metrics.filter(m => m.score === 'bad').length
 
-  // RSI alignment: bottom of RSI card = bottom of Nettomarge card
+  // RSI alignment: bottom of RSI = bottom of Nettomarge
   useEffect(() => {
-    if (!data || typeof window === 'undefined') return
-    let running = false
+    if (!data) return
     const align = () => {
-      if (running || window.innerWidth < 720) return
-      running = true
-      // Use setTimeout to ensure DOM is fully painted
-      setTimeout(() => {
-        const nettoEl = document.querySelector('[data-key="netMargin"]') as HTMLElement | null
-        const rsiEl   = document.querySelector('[data-key="rsi"]')       as HTMLElement | null
-        const spacer  = document.querySelector('.rsi-spacer')            as HTMLElement | null
-        if (nettoEl && rsiEl && spacer) {
-          // Reset spacer completely first
-          spacer.style.cssText = 'height:0px;flex-shrink:0;min-height:0'
-          // Wait for browser to reflow with height=0
-          setTimeout(() => {
-            const nb = nettoEl.getBoundingClientRect().bottom
-            const rb = rsiEl.getBoundingClientRect().bottom
-            const needed = Math.max(0, nb - rb)
-            spacer.style.height = needed + 'px'
-          }, 16)
-        }
-        running = false
-      }, 0)
+      if (window.innerWidth < 720) return
+      const netto  = document.querySelector('[data-key="netMargin"]') as HTMLElement | null
+      const rsi    = document.querySelector('[data-key="rsi"]')       as HTMLElement | null
+      const spacer = document.querySelector('.rsi-spacer')            as HTMLElement | null
+      if (!netto || !rsi || !spacer) return
+      // Reset → reflow → measure
+      spacer.style.height = '0px'
+      spacer.style.flexGrow = '0'
+      // Two nested rAFs guarantee layout is complete before measurement
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const diff = netto.getBoundingClientRect().bottom - rsi.getBoundingClientRect().bottom
+        spacer.style.height = Math.max(0, diff) + 'px'
+      }))
     }
-    // Run on every possible trigger
-    const timers = [0, 100, 300, 700, 1500].map(d => setTimeout(align, d))
-    const ro = new ResizeObserver(align)
-    document.querySelectorAll('.metric-card').forEach(el => ro.observe(el))
+    // Run immediately, on resize, and observe every metric card for size changes
+    align()
+    const ro = new ResizeObserver(() => align())
+    document.querySelectorAll('.metric-card, .metrics-grid').forEach(el => ro.observe(el))
     window.addEventListener('resize', align)
+    const timers = [100, 400, 1000].map(d => setTimeout(align, d))
     return () => {
-      timers.forEach(clearTimeout)
       ro.disconnect()
       window.removeEventListener('resize', align)
+      timers.forEach(clearTimeout)
     }
   }, [data, metrics])
 
@@ -418,7 +454,8 @@ export default function Home() {
           <div className="logo-icon">📈</div>
           <h1 className="logo-text">{langState === 'de' ? <>Aktien<span>check</span></> : <>Stock<span>check</span></>}</h1>
         </div>
-        <div style={{ display:'flex', gap:'8px' }}>
+        <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+          <Watchlist lang={langState} onSelect={search} />
           <LanguageToggle lang={langState} onToggle={toggleLang} />
           <ThemeToggle />
         </div>
@@ -461,38 +498,41 @@ export default function Home() {
             <div className="stock-header-top">
               {data.symbol && <div className="stock-logo-wrap"><StockLogo symbol={data.symbol} name={data.name} /></div>}
               <div className="stock-identity">
-                <span className="stock-name">{data.name || data.symbol}</span>
+                <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                  <span className="stock-name">{data.name || data.symbol}</span>
+                  <Watchlist
+                    currentSymbol={data.symbol}
+                    currentName={data.name}
+                    lang={langState}
+                    onSelect={search}
+                  />
+                </div>
                 <div className="stock-meta">
                   {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
                 </div>
               </div>
               {data.price != null && (
                 <div className="stock-price">
-                  {/* Row 1: Desktop = USD | EUR  /  Mobile = EUR bold */}
-                  {data.priceEur != null && data.currency !== 'EUR' ? (
-                    <>
-                      {/* Row 1: EUR bold */}
-                      <div className="price-eur-main">
-                        {Number(data.priceEur).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}€
-                      </div>
-                      {/* Row 2: USD light */}
+                  {/* Grid row 1: EUR price (bold) */}
+                  <div className="price-eur-main">
+                    {Number(data.priceEur ?? data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}{data.priceEur != null && data.currency !== 'EUR' ? '€' : (data.currency ?? '€')}
+                  </div>
+                  {/* Grid row 2: orig currency (if any) + Stand date */}
+                  <div className="price-date-row">
+                    {data.priceEur != null && data.currency !== 'EUR' && (
                       <div className="price-orig-main">
                         {Number(data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{' '}{data.currency}
                       </div>
-                    </>
-                  ) : (
-                    <div className="price-eur-main">
-                      {Number(data.priceEur ?? data.price).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}{'\u00a0'}{data.currency ?? '€'}
+                    )}
+                    <div className="price-date">
+                      {data.priceDate ? (
+                        <>
+                          {t.standPrefix}{' '}
+                          {new Date(data.priceDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}
+                          <span className="price-time-desktop">, {new Date(data.priceDate).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr</span>
+                        </>
+                      ) : t.currentPrice}
                     </div>
-                  )}
-                  <div className="price-date">
-                    {data.priceDate ? (
-                      <>
-                        {t.standPrefix}{' '}
-                        {new Date(data.priceDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}
-                        <span className="price-time-desktop">, {new Date(data.priceDate).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr</span>
-                      </>
-                    ) : t.currentPrice}
                   </div>
                 </div>
               )}
