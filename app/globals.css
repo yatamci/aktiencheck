@@ -818,6 +818,19 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   margin: 12px 0 20px;
+  justify-content: center;
+}
+@media (max-width: 600px) {
+  .alpha-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+  }
+  .alpha-bar::-webkit-scrollbar { display: none; }
+  .alpha-btn { flex-shrink: 0; }
 }
 
 .alpha-btn {
@@ -885,15 +898,16 @@ body {
 
 /* Header watchlist toggle */
 .watchlist-toggle {
-  display: flex; align-items: center; gap: 4px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 6px 10px;
+  border-radius: var(--r-sm); padding: 0;
+  width: 40px; height: 40px;
   cursor: pointer; color: var(--warn); font-size: 0.82rem;
   transition: background 0.15s;
 }
 .watchlist-toggle:hover { background: var(--surface-hover); }
-.watchlist-icon { font-size: 0.9rem; }
-.watchlist-count { font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 700; }
+.watchlist-icon { font-size: 1rem; line-height: 1; }
+.watchlist-count { font-family: 'DM Mono', monospace; font-size: 0.7rem; font-weight: 700; line-height: 1; }
 
 /* Dropdown panel */
 .watchlist-dropdown-wrap { position: relative; }
@@ -928,3 +942,19 @@ body {
 .watchlist-item:hover { background: var(--surface-hover); }
 .watchlist-item-name { font-size: 0.82rem; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .watchlist-item-sym  { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--accent); background: var(--accent-bg); padding: 1px 7px; border-radius: 999px; flex-shrink: 0; }
+
+/* Logo as button (click to go home) */
+.logo-btn {
+  background: transparent; border: none; cursor: pointer;
+  padding: 0; display: flex; align-items: center; gap: 12px;
+  text-align: left;
+}
+
+/* ── Alpha bar: centered + mobile horizontal scroll ── */
+
+/* Watchlist backdrop (close on click outside) */
+.watchlist-backdrop {
+  position: fixed; inset: 0; z-index: 99;
+  background: transparent;
+}
+.watchlist-panel { z-index: 100; }
