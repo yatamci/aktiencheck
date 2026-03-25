@@ -349,6 +349,37 @@ function getRecommendation(metrics: MetricResult[], crossSignal: string|undefine
 // We need lang in getRecommendation – use a module-level variable
 let lang: Lang = 'de'
 
+
+// ── WatchlistStar: inline star button only (no dropdown) ─────────────────────
+function WatchlistStar({ symbol, name, lang }: { symbol?: string; name?: string; lang: Lang }) {
+  const [watched, setWatched] = useState(false)
+  useEffect(() => {
+    try {
+      const items = JSON.parse(localStorage.getItem('watchlist') ?? '[]')
+      setWatched(items.some((i: {symbol:string}) => i.symbol === symbol))
+    } catch {}
+  }, [symbol])
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const items: {symbol:string;name:string;addedAt:string}[] = JSON.parse(localStorage.getItem('watchlist') ?? '[]')
+      const next = watched
+        ? items.filter(i => i.symbol !== symbol)
+        : [...items, { symbol: symbol!, name: name ?? symbol!, addedAt: new Date().toISOString() }]
+      localStorage.setItem('watchlist', JSON.stringify(next))
+      setWatched(!watched)
+    } catch {}
+  }
+  if (!symbol) return null
+  return (
+    <button
+      className={`watchlist-star${watched ? ' watchlist-star--on' : ''}`}
+      onClick={toggle}
+      title={watched ? (lang === 'de' ? 'Aus Watchlist entfernen' : 'Remove from watchlist') : (lang === 'de' ? 'Zur Watchlist hinzufügen' : 'Add to watchlist')}
+    >{watched ? '★' : '☆'}</button>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function Home() {
   const [data,         setData]         = useState<StockData | null>(null)
@@ -416,32 +447,38 @@ export default function Home() {
   const warnCount  = metrics.filter(m => m.score === 'warn').length
   const badCount   = metrics.filter(m => m.score === 'bad').length
 
-  // RSI alignment: bottom of RSI = bottom of Nettomarge
+  // RSI alignment: bottom of RSI card = bottom of Nettomarge card
   useEffect(() => {
     if (!data) return
+    let debounce = 0
     const align = () => {
-      if (window.innerWidth < 720) return
-      const netto  = document.querySelector('[data-key="netMargin"]') as HTMLElement | null
-      const rsi    = document.querySelector('[data-key="rsi"]')       as HTMLElement | null
-      const spacer = document.querySelector('.rsi-spacer')            as HTMLElement | null
-      if (!netto || !rsi || !spacer) return
-      // Reset → reflow → measure
-      spacer.style.height = '0px'
-      spacer.style.flexGrow = '0'
-      // Two nested rAFs guarantee layout is complete before measurement
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-        const diff = netto.getBoundingClientRect().bottom - rsi.getBoundingClientRect().bottom
-        spacer.style.height = Math.max(0, diff) + 'px'
-      }))
+      clearTimeout(debounce)
+      debounce = window.setTimeout(() => {
+        if (window.innerWidth < 720) return
+        const netto  = document.querySelector('[data-key="netMargin"]') as HTMLElement | null
+        const rsi    = document.querySelector('[data-key="rsi"]')       as HTMLElement | null
+        const spacer = document.querySelector('.rsi-spacer')            as HTMLElement | null
+        if (!netto || !rsi || !spacer) return
+        // Step 1: remove spacer so we can measure natural positions
+        spacer.style.cssText = 'height:0;flex-shrink:0;flex-grow:0;min-height:0'
+        // Step 2: after TWO paint frames (fully reflowed), measure and correct
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const nb = netto.getBoundingClientRect().bottom
+          const rb = rsi.getBoundingClientRect().bottom
+          const needed = Math.max(0, Math.round(nb - rb))
+          spacer.style.height = needed + 'px'
+        }))
+      }, 50)
     }
-    // Run immediately, on resize, and observe every metric card for size changes
-    align()
-    const ro = new ResizeObserver(() => align())
-    document.querySelectorAll('.metric-card, .metrics-grid').forEach(el => ro.observe(el))
+    // Observe only the right grid column for changes (not all cards → no feedback loop)
+    const rightCol = document.querySelector('.grid-col:last-child')
+    const ro = rightCol ? new ResizeObserver(align) : null
+    if (rightCol) ro?.observe(rightCol)
     window.addEventListener('resize', align)
-    const timers = [100, 400, 1000].map(d => setTimeout(align, d))
+    const timers = [150, 500, 1200].map(d => setTimeout(align, d))
     return () => {
-      ro.disconnect()
+      clearTimeout(debounce)
+      ro?.disconnect()
       window.removeEventListener('resize', align)
       timers.forEach(clearTimeout)
     }
@@ -450,10 +487,14 @@ export default function Home() {
   return (
     <main className="page-container">
       <header className="header">
-        <div className="logo">
+        <button
+          className="logo logo-btn"
+          onClick={() => { setData(null); setError(null); setRateLimited(false); window.history.replaceState(null,'','/') }}
+          title={langState === 'de' ? 'Zur Startseite' : 'Go to home'}
+        >
           <div className="logo-icon">📈</div>
           <h1 className="logo-text">{langState === 'de' ? <>Aktien<span>check</span></> : <>Stock<span>check</span></>}</h1>
-        </div>
+        </button>
         <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
           <Watchlist lang={langState} onSelect={search} />
           <LanguageToggle lang={langState} onToggle={toggleLang} />
@@ -461,7 +502,7 @@ export default function Home() {
         </div>
       </header>
 
-      <SearchBar onSearch={search} loading={loading} placeholder={t.searchPlaceholder} analyzeLabel={t.analyze} />
+      <SearchBar key={`sb-${langState}`} onSearch={search} loading={loading} placeholder={t.searchPlaceholder} analyzeLabel={t.analyze} />
 
       <AlphaBar />
 
@@ -500,12 +541,8 @@ export default function Home() {
               <div className="stock-identity">
                 <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
                   <span className="stock-name">{data.name || data.symbol}</span>
-                  <Watchlist
-                    currentSymbol={data.symbol}
-                    currentName={data.name}
-                    lang={langState}
-                    onSelect={search}
-                  />
+                  {/* Inline star only - no dropdown here */}
+                  {data.symbol && <WatchlistStar symbol={data.symbol} name={data.name} lang={langState} />}
                 </div>
                 <div className="stock-meta">
                   {data.symbol && <span className="stock-symbol">{data.symbol}</span>}
